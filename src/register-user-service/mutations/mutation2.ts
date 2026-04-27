@@ -1,0 +1,47 @@
+import {
+  UserRepository,
+  EmailService,
+  User
+} from '../contract/interfaces';
+
+export class RegisterUserService {
+  constructor(
+    private userRepository: UserRepository,
+    private emailService: EmailService
+  ) {}
+
+  async execute(input: {
+    name: string;
+    email: string;
+  }): Promise<User> {
+    const name = input.name?.trim();
+    const email = input.email?.trim().toLowerCase();
+
+    if (!name) {
+      throw new Error('Invalid name');
+    }
+
+    if (!email) {
+      throw new Error('Invalid email');
+    }
+
+    const existing = await this.userRepository.findByEmail(email);
+
+    if (existing) {
+      throw new Error('Email already registered');
+    }
+
+    await this.emailService.sendWelcomeEmail(
+      email,
+      name
+    );
+
+    const created = await this.userRepository.save({
+      name,
+      email
+    });
+
+
+    return created;
+  }
+}
