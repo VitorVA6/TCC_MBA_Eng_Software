@@ -1,4 +1,4 @@
-import { FraudAnalysisService } from '../solution/correct';
+import { FraudAnalysisService } from './correct';
 import {
   UserRepository,
   TransactionRepository,
@@ -7,7 +7,7 @@ import {
   AuditLogger,
   TransactionInput,
   TransactionHistory
-} from './interfaces';
+} from '../../stage-1/fraud-analysis-service/contract/interfaces';
 
 describe('FraudAnalysisService', () => {
   let fraudAnalysisService: FraudAnalysisService;
@@ -180,5 +180,18 @@ describe('FraudAnalysisService', () => {
     });
     const result = await fraudAnalysisService.execute(createInput({ amount: 180 })); // 180 > 1.5x 100 -> +1
     expect(result).toBe('REVIEW'); // 1 + 1 + 1 = 3
+  });
+  it('15. Should not apply abnormal amount penalty when historical average is zero', async () => {
+    setupMocks({
+      history: { averageAmount: 0, transactionsLast24h: 10 },
+      countryRisk: 70, 
+    });
+    
+    const result = await fraudAnalysisService.execute(createInput({ amount: 100 }));
+    
+    expect(result).toBe('REVIEW');
+    expect(notificationService.notifyReview).toHaveBeenCalled();
+    expect(notificationService.notifyBlocked).not.toHaveBeenCalled();
+    expect(auditLogger.log).toHaveBeenCalledWith(expect.objectContaining({ decision: 'REVIEW', score: 5 }));
   });
 });

@@ -6,7 +6,7 @@ import {
   RiskEngine,
   NotificationService,
   AuditLogger
-} from '../contract/interfaces';
+} from '../../stage-1/fraud-analysis-service/contract/interfaces';
 
 export class FraudAnalysisService {
   constructor(
@@ -42,12 +42,14 @@ export class FraudAnalysisService {
     if (countryRisk >= 70) score += 3;
     else if (countryRisk >= 40) score += 1;
 
-    if (input.amount > history.averageAmount * 3)
-      score += 3;
-    else if (
-      input.amount > history.averageAmount * 1.5
-    )
-      score += 1;
+    if (history.averageAmount > 0) {
+      if (input.amount > history.averageAmount * 3)
+        score += 3;
+      else if (
+        input.amount > history.averageAmount * 1.5
+      )
+        score += 1;
+    }
 
     if (history.transactionsLast24h >= 10)
       score += 2;
