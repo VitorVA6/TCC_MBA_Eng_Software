@@ -1,4 +1,4 @@
-import { FulfillmentAllocationService } from '../solution/correct';
+import { FulfillmentAllocationService } from './correct';
 import {
   OrderRepository,
   InventoryRepository,
@@ -10,7 +10,7 @@ import {
   InventoryBatch,
   Warehouse,
   CarrierOption
-} from './interfaces';
+} from '../../stage-1/fulfillment-allocation-service/contract/interfaces';
 
 describe('FulfillmentAllocationService', () => {
   let service: FulfillmentAllocationService;
@@ -599,6 +599,49 @@ describe('FulfillmentAllocationService', () => {
       expect(result.shipments[0].totalWeightKg.toString()).toMatch(/^\d+(\.\d{1,2})?$/);
       expect(result.shipments[0].shippingCost.toString()).toMatch(/^\d+(\.\d{1,2})?$/);
       expect(result.totalShippingCost.toString()).toMatch(/^\d+(\.\d{1,2})?$/);
+    });
+
+    it('34. Limits shipment allocation to carrier maxWeightKg', async () => {
+      orderRepository.findById.mockResolvedValue({
+        id: 'ord-1',
+        status: 'PAID',
+        destinationRegion: 'US-EAST',
+        createdAt: new Date().toISOString(),
+        items: [{ productId: 'PROD-1', quantity: 4, unitWeightKg: 2 }]
+      });
+
+      inventoryRepository.getBatches.mockResolvedValue([
+        { id: 'b1', productId: 'PROD-1', warehouseId: 'w1', availableQuantity: 10, expiresAt: getFutureDate() }
+      ]);
+
+      warehouseRepository.getWarehouses.mockResolvedValue([
+        { id: 'w1', active: true, supportedRegions: ['US-EAST'], priority: 1 }
+      ]);
+
+      carrierRepository.getOptions.mockResolvedValue([
+        { id: 'c1', warehouseId: 'w1', region: 'US-EAST', deliveryDays: 2, baseCost: 10, costPerKg: 1, maxWeightKg: 5 }
+      ]);
+
+      const result = await service.execute({ orderId: 'ord-1' });
+
+      expect(result.status).toBe('PARTIALLY_FULFILLED');
+      expect(result.shipments.length).toBe(1);
+      expect(result.shipments[0].items[0].quantity).toBe(2);
+      expect(result.shipments[0].totalWeightKg).toBe(4);
+      
+      expect(result.unfulfilledItems.length).toBe(1);
+      expect(result.unfulfilledItems[0].requestedQuantity).toBe(4);
+      expect(result.unfulfilledItems[0].fulfilledQuantity).toBe(2);
+
+      expect(reservationRepository.saveReservations).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ quantity: 2 })
+        ])
+      );
+
+      expect(eventBus.publish).toHaveBeenCalledWith('fulfillment.partial', expect.objectContaining({
+        orderId: 'ord-1'
+      }));
     });
   });
 });

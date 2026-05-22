@@ -1,4 +1,4 @@
-import { MarketplaceSettlementService } from '../solution/correct';
+import { MarketplaceSettlementService } from './correct';
 import {
   OrderRepository,
   OrderItemRepository,
@@ -13,7 +13,7 @@ import {
   Chargeback,
   Seller,
   CommissionRule,
-} from './interfaces';
+} from '../../stage-1/marketplace-settlement-service/contract/interfaces';
 
 describe('MarketplaceSettlementService', () => {
   let orderRepository: jest.Mocked<OrderRepository>;
@@ -449,5 +449,21 @@ describe('MarketplaceSettlementService', () => {
     expect(Number.isInteger(s1.chargebacks * 100)).toBe(true);
     expect(Number.isInteger(s1.net * 100)).toBe(true);
     expect(Number.isInteger(result.totalNet * 100)).toBe(true);
+  });
+
+  it('22. Refunds and chargebacks with negative values are ignored', async () => {
+    orderRepository.getOrders.mockResolvedValue([{ id: 'o1', currency: 'USD', date: '2023-01-10', shippingAmount: 0 }]);
+    orderItemRepository.getItems.mockResolvedValue([{ id: 'i1', orderId: 'o1', sellerId: 's1', category: 'cat', quantity: 1, unitPrice: 100 }]);
+    refundRepository.getRefunds.mockResolvedValue([{ orderItemId: 'i1', amount: -20 }]);
+    chargebackRepository.getChargebacks.mockResolvedValue([{ orderId: 'o1', amount: -30 }]);
+    sellerRepository.getSellers.mockResolvedValue([{ id: 's1', riskLevel: 'LOW' }]);
+    commissionRepository.getRules.mockResolvedValue([{ category: 'cat', percentage: 0 }]);
+
+    const result = await runService();
+
+    expect(result.settlements[0].gross).toBe(100);
+    expect(result.settlements[0].refunds).toBe(0);
+    expect(result.settlements[0].chargebacks).toBe(0);
+    expect(result.settlements[0].net).toBe(98.50);
   });
 });

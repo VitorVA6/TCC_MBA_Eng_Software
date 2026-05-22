@@ -1,4 +1,4 @@
-import { SubscriptionBillingService } from '../solution/correct';
+import { SubscriptionBillingService } from './correct';
 import {
   UserRepository,
   PlanRepository,
@@ -10,7 +10,7 @@ import {
   Plan,
   Subscription,
   Coupon
-} from './interfaces';
+} from './../../stage-1/subscription-billing-service/contract/interfaces';
 
 describe('SubscriptionBillingService', () => {
   let userRepository: jest.Mocked<UserRepository>;
@@ -353,5 +353,29 @@ describe('SubscriptionBillingService', () => {
     expect(subscriptionRepository.findByUserId).toHaveBeenCalledWith('user-123');
     expect(planRepository.findById).toHaveBeenCalledWith('plan-1');
     expect(taxService.getRate).toHaveBeenCalledWith('US');
+  });
+
+  it('17. Upgrade proportional billing caps daysRemaining at 30', async () => {
+    const currentPlan = mockPlan({ id: 'plan-1', monthlyPrice: 100 });
+    const targetPlan = mockPlan({ id: 'plan-2', monthlyPrice: 300 });
+
+    setupMocks(
+      mockUser({ isVip: false }),
+      mockSubscription({
+        status: 'ACTIVE',
+        currentPlanId: 'plan-1',
+        targetPlanId: 'plan-2',
+        daysRemaining: 45
+      }),
+      currentPlan,
+      10, // 10% tax
+      targetPlan
+    );
+
+    const result = await service.execute({ userId: 'user-123' });
+
+    expect(result.amount).toBe(220);
+    expect(result.blocked).toBe(false);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 220);
   });
 });

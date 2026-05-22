@@ -13,7 +13,7 @@ import {
   Refund,
   Chargeback,
   Seller
-} from '../contract/interfaces';
+} from '../../stage-1/marketplace-settlement-service/contract/interfaces';
 
 function round2(value: number): number {
   return Number(value.toFixed(2));
@@ -118,8 +118,9 @@ export class MarketplaceSettlementService {
 
     for (const item of items) {
       const gross = item.quantity * item.unitPrice;
+
       const refundTotal = (refundsByItemId.get(item.id) ?? []).reduce(
-        (sum, refund) => sum + refund.amount,
+        (sum, refund) => sum + Math.max(refund.amount, 0),
         0
       );
 
@@ -172,7 +173,10 @@ export class MarketplaceSettlementService {
       }
 
       const orderChargebackTotal = (chargebacksByOrderId.get(order.id) ?? [])
-        .reduce((sum, chargeback) => sum + chargeback.amount, 0);
+        .reduce(
+          (sum, chargeback) => sum + Math.max(chargeback.amount, 0),
+          0
+        );
 
       for (const [sellerId, sellerNet] of netBySellerInOrder.entries()) {
         const settlement = settlementBySeller.get(sellerId)!;

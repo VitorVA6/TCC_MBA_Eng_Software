@@ -1,4 +1,4 @@
-import { GlobalFulfillmentOptimizerService } from '../solution/correct';
+import { GlobalFulfillmentOptimizerService } from './correct';
 import {
   OrderRepository,
   StockRepository,
@@ -10,7 +10,7 @@ import {
   StockPosition,
   Warehouse,
   RouteEdge
-} from './interfaces';
+} from '../../stage-1/global-fulfillment-optimizer-service/contract/interfaces';
 
 describe('GlobalFulfillmentOptimizerService', () => {
   let service: GlobalFulfillmentOptimizerService;
@@ -139,6 +139,32 @@ describe('GlobalFulfillmentOptimizerService', () => {
 
       const result = await service.execute({ orderId: 'ORDER-123' });
       expect(result.status).toBe('NOT_FULFILLED');
+    });
+
+    it('27. Ignores routes that traverse through an inactive warehouse as an intermediate node', async () => {
+      const order = createBaseOrder();
+      orderRepository.findById.mockResolvedValue(order);
+      warehouseRepository.getWarehouses.mockResolvedValue([
+        { id: 'WH-1', active: true },
+        { id: 'WH-2', active: false },
+      ]);
+      stockRepository.getStock.mockResolvedValue([
+        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 },
+      ]);
+      routeRepository.getEdges.mockResolvedValue([
+        { id: 'E1', fromNode: 'WH-1', toNode: 'WH-2', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
+        { id: 'E2', fromNode: 'WH-2', toNode: 'DEST-1', active: true, fixedCost: 5, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
+      ]);
+
+      const result = await service.execute({ orderId: 'ORDER-123' });
+      
+      expect(result.status).toBe('NOT_FULFILLED');
+      expect(result.allocations.length).toBe(0);
+      expect(result.shipments.length).toBe(0);
+      expect(result.unfulfilledItems).toEqual([
+        { productId: 'PROD-A', requestedQuantity: 10, fulfilledQuantity: 0 }
+      ]);
+      expect(eventBus.publish).not.toHaveBeenCalled();
     });
   });
 
