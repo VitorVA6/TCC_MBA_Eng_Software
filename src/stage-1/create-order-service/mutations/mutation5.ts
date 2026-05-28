@@ -7,6 +7,8 @@ import {
   OrderItemInput
 } from '../contract/interfaces';
 
+// aceita lista vazia
+
 export class CreateOrderService {
   constructor(
     private productRepository: ProductRepository,

@@ -8,6 +8,8 @@ import {
   BillingResult
 } from '../contract/interfaces';
 
+// tax is applied before coupon and VIP discounts
+
 export class SubscriptionBillingService {
   constructor(
     private userRepository: UserRepository,

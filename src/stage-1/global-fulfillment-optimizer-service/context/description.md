@@ -1,33 +1,26 @@
 # GlobalFulfillmentOptimizerService
 
-This service creates an optimized fulfillment plan for a paid order.
+Este serviço cria um plano de atendimento (fulfillment) otimizado para um pedido pago, decidindo quais armazéns devem atender cada produto e qual rota de entrega deve ser utilizada.
 
-It must decide which warehouses should fulfill each product and which delivery route should be used from each warehouse to the destination.
+Dependências:
 
-Dependencies:
+- OrderRepository: recupera o pedido
+- StockRepository: recupera as posições de estoque para os produtos solicitados
+- WarehouseRepository: recupera os metadados do armazém
+- RouteRepository: recupera o grafo de rotas de entrega
+- FulfillmentPlanRepository: persiste o plano gerado
+- EventBus: publica eventos de atendimento
 
-- OrderRepository: retrieves the order
-- StockRepository: retrieves stock positions for requested products
-- WarehouseRepository: retrieves warehouse metadata
-- RouteRepository: retrieves the delivery route graph
-- FulfillmentPlanRepository: persists the generated plan
-- EventBus: publishes fulfillment events
+Regras de negócio:
 
-Business rules combine:
-
-1. Order status validation
-2. Stock availability
-3. Active warehouse filtering
-4. Route graph traversal
-5. Route feasibility by weight and delivery time
-6. Global cost minimization
-7. Partial fulfillment
-8. Shipment grouping by warehouse
-9. Deterministic tie-breaking
-10. Persistence and event publication
-
-Only PAID orders can be fulfilled.
-
-The service should search for a globally optimized plan, not just choose the cheapest option for each item independently.
-
-The result should indicate whether the order was fully fulfilled, partially fulfilled, or not fulfilled.
+1. Validar o status do pedido (apenas pedidos PAID podem ser atendidos)
+2. Validar a disponibilidade de estoque
+3. Filtrar armazéns ativos
+4. Percorrer o grafo de rotas
+5. Validar a viabilidade da rota por peso e tempo de entrega
+6. Minimizar o custo global em vez de escolher apenas a opção mais barata para cada item independentemente
+7. Suportar atendimento parcial
+8. Agrupar envios por armazém
+9. Desempatar de forma determinística
+10. Persistir o plano e publicar eventos
+11. Retornar se o pedido foi atendido totalmente, parcialmente ou não atendido

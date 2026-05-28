@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// prioriza menor custo antes de maior quantidade atendida
+// 17. Prefers full fulfillment over cheaper partial fulfillment
+// 18. Returns PARTIALLY_FULFILLED when only part of the order can be fulfilled
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

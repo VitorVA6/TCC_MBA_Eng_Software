@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// ignora limite máximo de dias
+// removed maxDeliveryDays validation
+// 10. Ignores routes whose total deliveryDays exceeds order maxDeliveryDays
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

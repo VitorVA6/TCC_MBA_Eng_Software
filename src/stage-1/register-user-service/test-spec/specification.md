@@ -1,12 +1,12 @@
-The generated test suite must validate:
+A suíte de testes gerada deve validar:
 
-1. Successful user registration with valid name and email
-2. Name must be non-empty
-3. Email must be non-empty
-4. Should throw an error if email already exists
-5. Should save the user using repository
-6. Should send welcome email after successful creation
-7. Should return the created user object
-8. Should not send email if creation fails
-9. Should not save user when validation fails
-10. Repository methods must receive correct arguments
+1. Deve registrar o usuário com sucesso com nome e e-mail válidos
+2. Deve lançar um erro quando o nome estiver vazio
+3. Deve lançar um erro quando o e-mail estiver vazio
+4. Deve lançar um erro se o e-mail já existir
+5. Deve salvar o usuário usando o repositório
+6. Deve enviar o e-mail de boas-vindas após a criação com sucesso
+7. Deve retornar o objeto do usuário criado
+8. Não deve enviar e-mail se a criação falhar
+9. Não deve salvar o usuário quando a validação falhar
+10. Deve chamar os métodos do repositório com os argumentos corretos

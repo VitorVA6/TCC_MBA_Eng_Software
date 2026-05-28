@@ -10,6 +10,8 @@ export class RegisterUserService {
     private emailService: EmailService
   ) {}
 
+  // remove findByEmail check
+  
   async execute(input: {
     name: string;
     email: string;

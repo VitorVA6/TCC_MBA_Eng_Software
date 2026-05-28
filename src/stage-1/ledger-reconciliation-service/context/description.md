@@ -1,21 +1,20 @@
 # LedgerReconciliationService
 
-This service reconciles internal financial records with bank statement entries.
+Este serviço reconcilia os registros financeiros internos com os lançamentos do extrato bancário.
 
-Dependencies:
+Dependências:
 
-- InternalLedgerRepository: returns internal entries
-- BankStatementProvider: returns bank statement entries
-- AuditLogger: stores reconciliation execution logs
+- InternalLedgerRepository: retorna os lançamentos internos
+- BankStatementProvider: retorna os lançamentos do extrato bancário
+- AuditLogger: armazena os logs de execução da reconciliação
 
-Matching rules:
+Regras de negócio:
 
-1. Entries are matched by reference.
-2. If multiple bank entries share same reference, they are duplicates.
-3. If matched references have different amounts, classify as amountMismatch.
-4. Internal entries without bank match are missingInternal.
-5. Bank entries without internal match are unexpectedBank.
-6. Correct matches go to matched.
-
-Output must contain lists of references.
-Audit log must always be written.
+1. Corresponder os lançamentos por referência
+2. Classificar múltiplos lançamentos bancários que compartilham a mesma referência como duplicados
+3. Classificar referências correspondentes com valores diferentes como divergência de valor (amountMismatch)
+4. Classificar lançamentos internos sem correspondência bancária como interno ausente (missingInternal)
+5. Classificar lançamentos bancários sem correspondência interna como banco inesperado (unexpectedBank)
+6. Classificar correspondências corretas como correspondidas (matched)
+7. Gerar como saída listas de referências
+8. Sempre gravar log de auditoria

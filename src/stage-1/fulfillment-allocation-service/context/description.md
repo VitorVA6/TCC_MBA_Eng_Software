@@ -1,33 +1,28 @@
 # FulfillmentAllocationService
 
-This service creates a fulfillment plan for a paid order.
+Este serviço cria um plano de atendimento (fulfillment) para um pedido pago, decidindo quais lotes de estoque reservar, quais armazéns devem enviar os produtos e quais transportadoras utilizar.
 
-It decides which inventory batches should be reserved, which warehouses should ship the products, and which carriers should be used.
+Dependências:
 
-Dependencies:
+- OrderRepository: recupera os dados do pedido
+- InventoryRepository: recupera os lotes de estoque
+- WarehouseRepository: recupera os metadados do armazém
+- CarrierRepository: recupera as opções de transportadoras para a região de destino
+- ReservationRepository: recupera as quantidades já reservadas e salva novas reservas
+- EventBus: publica eventos de atendimento (fulfillment)
 
-- OrderRepository: retrieves order data
-- InventoryRepository: retrieves inventory batches
-- WarehouseRepository: retrieves warehouse metadata
-- CarrierRepository: retrieves carrier options for the destination region
-- ReservationRepository: retrieves already reserved quantities and saves new reservations
-- EventBus: publishes fulfillment events
+Regras de negócio:
 
-Business rules combine:
-
-1. Order status validation
-2. Inventory availability
-3. Existing reservations
-4. Batch expiration
-5. Warehouse eligibility
-6. Carrier eligibility
-7. Allocation priority
-8. Partial fulfillment
-9. Shipment grouping
-10. Shipping cost calculation
-11. Reservation persistence
-12. Fulfillment event publication
-
-Only paid orders can be fulfilled.
-
-The service should allocate available stock from eligible warehouses and carriers, create grouped shipments, save reservations for allocated quantities, and return a fulfillment plan indicating whether the order was fully, partially, or not fulfilled.
+1. Validar o status do pedido (apenas pedidos pagos podem ser atendidos)
+2. Validar a disponibilidade de estoque
+3. Considerar reservas existentes
+4. Validar o vencimento dos lotes
+5. Validar a elegibilidade do armazém
+6. Validar a elegibilidade da transportadora
+7. Priorizar a alocação
+8. Suportar atendimento parcial (partial fulfillment)
+9. Agrupar envios (shipments)
+10. Calcular o custo de envio
+11. Persistir as reservas para as quantidades alocadas
+12. Publicar eventos de atendimento
+13. Retornar um plano de atendimento indicando se o pedido foi atendido total, parcialmente ou não atendido

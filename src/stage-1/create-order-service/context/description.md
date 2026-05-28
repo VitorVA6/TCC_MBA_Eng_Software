@@ -1,20 +1,20 @@
 # CreateOrderService
 
-This service creates customer orders.
+Este serviço cria pedidos de clientes.
 
-Dependencies:
+Dependências:
 
-- ProductRepository: retrieves product data
-- OrderRepository: persists orders
-- EventBus: publishes integration events
+- ProductRepository: recupera dados do produto
+- OrderRepository: persiste os pedidos
+- EventBus: publica eventos de integração
 
-Business flow:
+Regras de negócio:
 
-1. Validate received items
-2. Retrieve products by id
-3. Validate stock availability
-4. Calculate order subtotal per item
-5. Calculate total order amount
-6. Persist order
-7. Publish "order.created" event
-8. Return created order
+1. Validar os itens recebidos
+2. Recuperar produtos por id
+3. Validar a disponibilidade de estoque
+4. Calcular o subtotal do pedido por item
+5. Calcular o valor total do pedido
+6. Persistir o pedido
+7. Publicar o evento "order.created"
+8. Retornar o pedido criado

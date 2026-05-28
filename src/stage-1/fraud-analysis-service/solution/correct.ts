@@ -8,6 +8,8 @@ import {
   AuditLogger
 } from '../contract/interfaces';
 
+// nível fácil
+
 export class FraudAnalysisService {
   constructor(
     private userRepository: UserRepository,

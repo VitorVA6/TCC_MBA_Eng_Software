@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// usa rota direta apenas
+// Dentro de findCheapestRoute, substitui busca no grafo por apenas aresta direta.
+// 8. Finds a valid multi-hop route from warehouse to destination
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

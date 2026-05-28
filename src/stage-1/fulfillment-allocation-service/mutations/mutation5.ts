@@ -14,6 +14,8 @@ import {
   Shipment
 } from '../contract/interfaces';
 
+// ignora limite de peso do carrier
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

@@ -1,23 +1,23 @@
-The generated test suite must validate:
+A suíte de testes gerada deve validar:
 
-1. Empty order list returns empty settlement result and still saves it.
-2. Repository dependencies are called with correct ids and date range.
-3. Gross is calculated from quantity * unitPrice.
-4. Refunds are assigned to the correct seller through orderItemId.
-5. Multiple refunds for the same item are summed.
-6. Refunds cannot reduce an item below zero.
-7. Shipping is split proportionally by seller net item value within the same order.
-8. Shipping share is zero when all items in an order are fully refunded.
-9. Commission is calculated per item after refunds and before shipping.
-10. Missing commission rule means 0% commission.
-11. Chargebacks are allocated proportionally by seller net item value after refunds.
-12. Chargeback allocation is zero when all items in an order are fully refunded.
-13. Fixed fee of 1.50 applies only when value before fixed fee is positive.
-14. Net cannot be negative.
-15. HIGH risk sellers are marked as held but still have net calculated.
-16. LOW and MEDIUM risk sellers are not held.
-17. totalGross equals the sum of seller gross.
-18. totalNet equals the sum of seller net.
-19. Returned result and saved result are identical.
-20. Mixed scenario with multiple orders, multiple sellers, refunds, chargebacks, commissions, shipping split, and held seller.
-21. Final monetary fields are rounded to 2 decimal places.
+1. Deve retornar um resultado de repasse vazio e salvá-lo quando a lista de pedidos estiver vazia
+2. Deve chamar os repositórios dependentes com os ids e intervalo de datas corretos
+3. Deve calcular o bruto (gross) a partir da quantidade * unitPrice
+4. Deve atribuir reembolsos ao vendedor correto através do orderItemId
+5. Deve somar múltiplos reembolsos para o mesmo item
+6. Não deve reduzir um item para menos de zero devido a reembolsos
+7. Deve dividir o frete proporcionalmente pelo valor líquido do item do vendedor dentro do mesmo pedido
+8. Deve calcular a parcela do frete como zero quando todos os itens de um pedido forem totalmente reembolsados
+9. Deve calcular a comissão por item após reembolsos e antes do frete
+10. Deve aplicar 0% de comissão quando não houver regra de comissão
+11. Deve alocar chargebacks proporcionalmente pelo valor líquido do item do vendedor após os reembolsos
+12. Deve calcular a alocação de chargeback como zero quando todos os itens de um pedido forem totalmente reembolsados
+13. Deve aplicar a taxa fixa de 1.50 apenas quando o valor antes da taxa fixa for positivo
+14. Não deve permitir nunca que o líquido (net) seja negativo
+15. Deve marcar vendedores de alto risco (HIGH) como retidos (held) mas ainda calcular seu líquido
+16. Não deve reter vendedores de risco baixo (LOW) ou médio (MEDIUM)
+17. Deve calcular totalGross como a soma do bruto dos vendedores
+18. Deve calcular totalNet como a soma do líquido dos vendedores
+19. Deve garantir que o resultado retornado e o resultado salvo sejam idênticos
+20. Deve lidar com cenário misto com múltiplos pedidos, vendedores, reembolsos, chargebacks, comissões, divisão de frete e vendedor retido
+21. Deve arredondar os campos monetários finais para 2 casas decimais

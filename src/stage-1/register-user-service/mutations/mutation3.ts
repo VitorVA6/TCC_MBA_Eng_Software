@@ -4,6 +4,8 @@ import {
   User
 } from '../contract/interfaces';
 
+// não normaliza email
+
 export class RegisterUserService {
   constructor(
     private userRepository: UserRepository,

@@ -14,6 +14,9 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// salva resultado diferente do retornado
+// 22. Saves the same result returned by execute
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

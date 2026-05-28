@@ -14,6 +14,9 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// calcula custo da rota sem custo fixo
+// 13. Calculates route cost as sum of fixedCost plus costPerKg times shipment weight for each edge in the path
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

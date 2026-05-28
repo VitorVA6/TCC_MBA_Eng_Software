@@ -4,6 +4,8 @@ import {
   User
 } from '../contract/interfaces';
 
+// nível fácil
+
 export class RegisterUserService {
   constructor(
     private userRepository: UserRepository,

@@ -8,6 +8,8 @@ import {
   ReconciliationResult
 } from '../contract/interfaces';
 
+// duplicate treated as matched
+
 export class LedgerReconciliationService {
   constructor(
     private internalRepository: InternalLedgerRepository,

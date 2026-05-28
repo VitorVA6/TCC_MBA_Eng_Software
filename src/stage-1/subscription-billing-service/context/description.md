@@ -1,29 +1,27 @@
 # SubscriptionBillingService
 
-This service calculates and charges the current billing cycle.
+Este serviço calcula e cobra o ciclo de faturamento atual.
 
-Dependencies:
+Dependências:
 
-- UserRepository
-- PlanRepository
-- SubscriptionRepository
-- CouponRepository
-- TaxService
-- PaymentGateway
+- UserRepository: recupera dados do usuário
+- PlanRepository: recupera os planos de assinatura
+- SubscriptionRepository: recupera e persiste assinaturas
+- CouponRepository: recupera cupons de desconto
+- TaxService: aplica impostos
+- PaymentGateway: processa pagamentos
 
-Rules:
+Regras de negócio:
 
-1. TRIAL users are not charged.
-2. PAST_DUE users are blocked and no charge happens.
-3. ACTIVE users are charged normally.
-4. If targetPlanId exists and target plan is more expensive than current:
-   charge only proportional difference using daysRemaining / 30.
-5. If targetPlanId exists and target plan is cheaper:
-   downgrade only next cycle, current charge remains current plan price.
-6. Valid active coupon applies percentage discount before taxes.
-7. VIP users receive additional 10 percent discount after coupon.
-8. Tax is applied after all discounts.
-9. Final amount cannot be negative.
-10. If final amount is zero, no charge happens.
-11. PaymentGateway is called only when amount > 0 and not blocked.
-12. Return blocked reason when blocked.
+1. Não cobrar usuários TRIAL
+2. Bloquear usuários PAST_DUE e não cobrar
+3. Cobrar usuários ACTIVE normalmente
+4. Se targetPlanId existir e o plano de destino for mais caro que o atual, cobrar apenas a diferença proporcional usando daysRemaining / 30
+5. Se targetPlanId existir e o plano de destino for mais barato, fazer o downgrade apenas no próximo ciclo e manter a cobrança atual no preço do plano atual
+6. Aplicar desconto percentual de cupom ativo antes dos impostos
+7. Aplicar desconto adicional de 10 por cento para usuários VIP após o cupom
+8. Aplicar imposto após todos os descontos
+9. Garantir que o valor final nunca seja negativo
+10. Não cobrar se o valor final for zero
+11. Chamar o PaymentGateway apenas quando o valor > 0 e o usuário não estiver bloqueado
+12. Retornar o motivo do bloqueio quando estiver bloqueado

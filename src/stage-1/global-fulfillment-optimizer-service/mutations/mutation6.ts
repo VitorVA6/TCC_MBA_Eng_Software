@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// ignora limite de peso da rota
+
+// 9. Ignores routes whose maxWeightKg is smaller than shipment total weight
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

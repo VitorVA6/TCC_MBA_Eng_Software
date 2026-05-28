@@ -7,6 +7,8 @@ import {
   OrderItemInput
 } from '../contract/interfaces';
 
+// não valida estoque
+
 export class CreateOrderService {
   constructor(
     private productRepository: ProductRepository,

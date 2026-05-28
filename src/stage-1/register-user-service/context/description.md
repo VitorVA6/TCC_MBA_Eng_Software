@@ -1,16 +1,16 @@
 # RegisterUserService
 
-This service is responsible for registering new users.
+Este serviço registra novos usuários.
 
-It depends on:
+Dependências:
 
-- UserRepository: persistence and user lookup
-- EmailService: sends welcome emails
+- UserRepository: persistência e busca de usuários
+- EmailService: envia e-mails de boas-vindas
 
-Expected business flow:
+Regras de negócio:
 
-1. Validate input data
-2. Check if the email is already registered
-3. Persist the new user
-4. Send welcome email
-5. Return the created user
+1. Validar os dados de entrada
+2. Verificar se o e-mail já está registrado
+3. Persistir o novo usuário
+4. Enviar e-mail de boas-vindas
+5. Retornar o usuário criado

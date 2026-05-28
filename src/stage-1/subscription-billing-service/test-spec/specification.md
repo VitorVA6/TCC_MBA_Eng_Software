@@ -1,18 +1,18 @@
-The generated test suite must validate:
+A suíte de testes gerada deve validar:
 
-1. Trial users are not charged
-2. Past due users are blocked
-3. Normal active monthly charge
-4. Upgrade prorated billing
-5. Downgrade charged only current plan
-6. Active coupon discount
-7. Inactive coupon ignored
-8. VIP extra discount after coupon
-9. Taxes applied after discounts
-10. Amount never negative
-11. Zero amount does not charge gateway
-12. Gateway called with correct amount
-13. Combined coupon + VIP + tax scenario
-14. Upgrade with coupon and tax
-15. Correct blocked response
-16. Correct dependency calls
+1. Não deve cobrar usuários trial
+2. Deve bloquear usuários past due (em atraso)
+3. Deve cobrar normalmente o ciclo mensal ativo
+4. Deve cobrar o valor proporcional (prorated) para o upgrade
+5. Deve cobrar apenas o plano atual para o downgrade
+6. Deve aplicar desconto de cupom ativo
+7. Deve ignorar cupom inativo
+8. Deve aplicar desconto extra VIP após o cupom
+9. Deve aplicar impostos após os descontos
+10. Nunca deve resultar em um valor negativo
+11. Não deve cobrar no gateway quando o valor for zero
+12. Deve chamar o gateway com o valor correto
+13. Deve lidar com cenário combinado de cupom, VIP e imposto
+14. Deve lidar com upgrade com cupom e imposto
+15. Deve retornar a resposta de bloqueio correta
+16. Deve chamar as dependências corretamente

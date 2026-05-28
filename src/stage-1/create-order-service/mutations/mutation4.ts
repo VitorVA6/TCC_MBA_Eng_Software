@@ -7,6 +7,8 @@ import {
   OrderItemInput
 } from '../contract/interfaces';
 
+// subtotal ignora quantity
+
 export class CreateOrderService {
   constructor(
     private productRepository: ProductRepository,

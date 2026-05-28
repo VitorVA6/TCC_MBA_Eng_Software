@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// ignora warehouses inativos
+
+// 5. Ignores stock from inactive warehouses
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

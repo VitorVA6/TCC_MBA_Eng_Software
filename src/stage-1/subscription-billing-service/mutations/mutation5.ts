@@ -8,6 +8,8 @@ import {
   BillingResult
 } from '../contract/interfaces';
 
+// gateway is called even when amount is zero
+
 export class SubscriptionBillingService {
   constructor(
     private userRepository: UserRepository,

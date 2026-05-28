@@ -5,6 +5,8 @@ import {
   ReconciliationResult
 } from '../contract/interfaces';
 
+// unexpected bank omitted
+
 export class LedgerReconciliationService {
   constructor(
     private internalRepository: InternalLedgerRepository,

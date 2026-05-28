@@ -1,28 +1,28 @@
-The generated test suite must validate:
+A suíte de testes gerada deve validar:
 
-1. Returns NOT_FULFILLED when order does not exist
-2. Returns NOT_FULFILLED for PENDING orders
-3. Returns NOT_FULFILLED for CANCELLED orders
-4. Fetches stock using all unique product ids from the order
-5. Ignores stock from inactive warehouses
-6. Ignores stock positions with zero quantity
-7. Ignores inactive route edges
-8. Finds a valid multi-hop route from warehouse to destination
-9. Ignores routes whose maxWeightKg is smaller than shipment total weight
-10. Ignores routes whose total deliveryDays exceeds order maxDeliveryDays
-11. Groups allocations by warehouse
-12. Calculates shipment totalWeightKg correctly
-13. Calculates route cost as sum of fixedCost plus costPerKg times shipment weight for each edge in the path
-14. Minimizes total cost globally
-15. Does not use greedy per-item allocation when it produces higher total cost
-16. Supports splitting fulfillment across multiple warehouses when necessary
-17. Prefers full fulfillment over cheaper partial fulfillment
-18. Returns PARTIALLY_FULFILLED when only part of the order can be fulfilled
-19. Returns NOT_FULFILLED when no item can be fulfilled
-20. Reports unfulfilled items with requestedQuantity and fulfilledQuantity
-21. Uses deterministic tie-breaking when two plans have same fulfilled quantity and same total cost
-22. Saves the same result returned by execute
-23. Publishes fulfillment.optimized when fully fulfilled
-24. Publishes fulfillment.partial when partially fulfilled
-25. Does not publish event when nothing is fulfilled
-26. Final monetary and weight fields are rounded to 2 decimal places
+1. Deve retornar NOT_FULFILLED quando o pedido não existir
+2. Deve retornar NOT_FULFILLED para pedidos PENDING
+3. Deve retornar NOT_FULFILLED para pedidos CANCELLED
+4. Deve buscar o estoque usando todos os ids únicos de produto do pedido
+5. Deve ignorar o estoque de armazéns inativos
+6. Deve ignorar as posições de estoque com quantidade zero
+7. Deve ignorar arestas de rota inativas
+8. Deve encontrar uma rota válida com múltiplos saltos (multi-hop) do armazém até o destino
+9. Deve ignorar rotas cuja maxWeightKg seja menor que o peso total do envio
+10. Deve ignorar rotas cujos deliveryDays totais excedam os maxDeliveryDays do pedido
+11. Deve agrupar as alocações por armazém
+12. Deve calcular o totalWeightKg do envio corretamente
+13. Deve calcular o custo da rota como a soma do fixedCost mais o costPerKg vezes o peso do envio para cada aresta no caminho
+14. Deve minimizar o custo total globalmente
+15. Não deve usar a alocação gulosa (greedy) por item quando esta produzir um custo total maior
+16. Deve suportar a divisão do atendimento em múltiplos armazéns quando necessário
+17. Deve preferir o atendimento total ao invés do atendimento parcial mais barato
+18. Deve retornar PARTIALLY_FULFILLED quando apenas parte do pedido puder ser atendida
+19. Deve retornar NOT_FULFILLED quando nenhum item puder ser atendido
+20. Deve relatar os itens não atendidos com requestedQuantity e fulfilledQuantity
+21. Deve usar um desempate determinístico quando dois planos tiverem a mesma quantidade atendida e o mesmo custo total
+22. Deve salvar o mesmo resultado retornado pelo método execute
+23. Deve publicar fulfillment.optimized quando totalmente atendido
+24. Deve publicar fulfillment.partial quando parcialmente atendido
+25. Não deve publicar o evento quando nada for atendido
+26. Deve arredondar os campos monetários e de peso finais para 2 casas decimais

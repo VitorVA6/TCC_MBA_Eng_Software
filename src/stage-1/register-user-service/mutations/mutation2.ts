@@ -4,6 +4,8 @@ import {
   User
 } from '../contract/interfaces';
 
+// envia e-mail antes de salvar
+
 export class RegisterUserService {
   constructor(
     private userRepository: UserRepository,

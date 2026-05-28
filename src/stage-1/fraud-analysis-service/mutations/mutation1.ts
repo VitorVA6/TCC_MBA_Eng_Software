@@ -8,6 +8,8 @@ import {
   AuditLogger
 } from '../contract/interfaces';
 
+// VIP não reduz score
+
 export class FraudAnalysisService {
   constructor(
     private userRepository: UserRepository,

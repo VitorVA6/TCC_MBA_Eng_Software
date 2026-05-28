@@ -14,6 +14,8 @@ import {
   Shipment
 } from '../contract/interfaces';
 
+// publica evento mesmo quando nada é fulfilled
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// aceita rota inativa
+
+// 7. Ignores inactive route edges
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

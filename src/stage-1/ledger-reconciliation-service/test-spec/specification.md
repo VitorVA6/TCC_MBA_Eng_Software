@@ -1,14 +1,14 @@
-The generated test suite must validate:
+A suíte de testes gerada deve validar:
 
-1. Successful exact matches
-2. Internal entries missing in bank statement
-3. Unexpected bank entries
-4. Duplicate bank references
-5. Amount mismatch detection
-6. Mixed scenarios in same execution
-7. Empty datasets
-8. Correct dependency calls with date range
-9. Audit log always executed
-10. Output structure correctness
-11. Multiple internal records with different references
-12. Ensure duplicate entries are not classified as matched
+1. Deve corresponder lançamentos exatos com sucesso
+2. Deve identificar lançamentos internos ausentes no extrato bancário
+3. Deve identificar lançamentos bancários inesperados
+4. Deve identificar referências bancárias duplicadas
+5. Deve detectar divergência de valor
+6. Deve lidar com cenários mistos na mesma execução
+7. Deve lidar com conjuntos de dados vazios
+8. Deve chamar dependências com o intervalo de datas correto
+9. Deve sempre executar o log de auditoria
+10. Deve retornar a estrutura de saída correta
+11. Deve suportar múltiplos registros internos com referências diferentes
+12. Deve garantir que lançamentos duplicados não sejam classificados como correspondidos

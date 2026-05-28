@@ -7,6 +7,8 @@ import {
   OrderItemInput
 } from '../contract/interfaces';
 
+// evento publicado antes do save
+
 export class CreateOrderService {
   constructor(
     private productRepository: ProductRepository,

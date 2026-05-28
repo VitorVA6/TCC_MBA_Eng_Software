@@ -1,4 +1,4 @@
-import { FulfillmentAllocationService } from '../solution/correct';
+import { FulfillmentAllocationService } from '../mutations/mutation1';
 import {
   OrderRepository,
   InventoryRepository,

@@ -14,6 +14,8 @@ import {
   Shipment
 } from '../contract/interfaces';
 
+// não agrupa shipments por warehouse + carrier
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

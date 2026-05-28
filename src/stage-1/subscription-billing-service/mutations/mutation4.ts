@@ -8,6 +8,8 @@ import {
   BillingResult
 } from '../contract/interfaces';
 
+// downgrade incorrectly charges the target cheaper plan immediately
+
 export class SubscriptionBillingService {
   constructor(
     private userRepository: UserRepository,

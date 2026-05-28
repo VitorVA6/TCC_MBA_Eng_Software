@@ -1,16 +1,16 @@
-The generated test suite must validate:
+A suíte de testes gerada deve validar:
 
-1. Should approve low-risk transactions
-2. Should review medium-risk transactions
-3. Should block high-risk transactions
-4. Should throw error when amount is zero or negative
-5. Should increase scrutiny when country risk is high
-6. Should increase scrutiny when amount is much higher than historical average
-7. Should increase scrutiny when many transactions happened in last 24h
-8. VIP users should have reduced risk impact
-9. Should call dependencies with correct arguments
-10. Should notify user when decision is REVIEW
-11. Should notify user when decision is BLOCKED
-12. Should not notify on APPROVED
-13. Should always write audit log with decision result
-14. Should support combined risk factors
+1. Deve aprovar transações de baixo risco
+2. Deve revisar transações de médio risco
+3. Deve bloquear transações de alto risco
+4. Deve lançar um erro quando o valor for zero ou negativo
+5. Deve aumentar o escrutínio quando o risco do país for alto
+6. Deve aumentar o escrutínio quando o valor for muito maior que a média histórica
+7. Deve aumentar o escrutínio quando muitas transações ocorreram nas últimas 24 horas
+8. Deve reduzir o impacto do risco para usuários VIP
+9. Deve chamar as dependências com os argumentos corretos
+10. Deve notificar o usuário quando a decisão for REVIEW
+11. Deve notificar o usuário quando a decisão for BLOCKED
+12. Não deve notificar em caso de APPROVED
+13. Deve sempre gravar o log de auditoria com o resultado da decisão
+14. Deve suportar fatores de risco combinados

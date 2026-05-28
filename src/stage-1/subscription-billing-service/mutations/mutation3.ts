@@ -8,6 +8,8 @@ import {
   BillingResult
 } from '../contract/interfaces';
 
+// inactive coupons are applied
+
 export class SubscriptionBillingService {
   constructor(
     private userRepository: UserRepository,

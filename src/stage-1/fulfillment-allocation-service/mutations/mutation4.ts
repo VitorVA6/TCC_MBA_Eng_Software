@@ -18,6 +18,8 @@ function round2(value: number): number {
   return Number(value.toFixed(2));
 }
 
+// removed supported region validation
+
 export class FulfillmentAllocationService {
   constructor(
     private orderRepository: OrderRepository,

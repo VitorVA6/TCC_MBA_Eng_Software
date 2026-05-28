@@ -14,6 +14,9 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// publica evento mesmo quando nada foi atendido
+// 25. Does not publish event when nothing is fulfilled
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

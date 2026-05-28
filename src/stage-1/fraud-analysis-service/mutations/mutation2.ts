@@ -8,6 +8,8 @@ import {
   AuditLogger
 } from '../contract/interfaces';
 
+// thresholds errados
+
 export class FraudAnalysisService {
   constructor(
     private userRepository: UserRepository,

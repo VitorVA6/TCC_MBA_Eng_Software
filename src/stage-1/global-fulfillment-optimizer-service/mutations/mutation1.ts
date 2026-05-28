@@ -14,6 +14,17 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// MUTATION 1
+// Greedy per-unit allocation instead of global optimization.
+
+// Ideia da mutação:
+// Trocar o findBestPlan por uma versão gulosa que, para cada unidade,
+// escolhe o primeiro warehouse viável de menor rota individual,
+// sem considerar custo fixo compartilhado por shipment.
+
+// 14. Minimizes total cost globally
+// 15. Does not use greedy per-item allocation when it produces higher total cost
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

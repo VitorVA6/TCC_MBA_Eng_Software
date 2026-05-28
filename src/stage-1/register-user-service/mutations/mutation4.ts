@@ -4,6 +4,8 @@ import {
   User
 } from '../contract/interfaces';
 
+// envia email mesmo se save falhar
+
 export class RegisterUserService {
   constructor(
     private userRepository: UserRepository,

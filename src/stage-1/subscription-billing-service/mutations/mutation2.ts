@@ -8,6 +8,8 @@ import {
   BillingResult
 } from '../contract/interfaces';
 
+// TRIAL users are charged instead of returning zero
+
 export class SubscriptionBillingService {
   constructor(
     private userRepository: UserRepository,

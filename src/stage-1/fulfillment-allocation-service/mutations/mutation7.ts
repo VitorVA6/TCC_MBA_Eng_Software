@@ -14,6 +14,8 @@ import {
   Shipment
 } from '../contract/interfaces';
 
+// escolhe batch mais tardio em vez do mais próximo de expirar
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

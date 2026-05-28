@@ -1,31 +1,28 @@
 # MarketplaceSettlementService
 
-This service calculates marketplace settlements for sellers within a date range.
+Este serviço calcula os repasses (settlements) do marketplace para os vendedores dentro de um intervalo de datas, avaliando pedidos, itens, reembolsos, chargebacks, dados de risco e regras de comissão.
 
-It receives orders, order items, refunds, chargebacks, seller risk data, and commission rules.
-It must produce a settlement summary per seller and global totals.
+Dependências:
 
-Dependencies:
+- OrderRepository: retorna os pedidos no período solicitado
+- OrderItemRepository: retorna os itens para os pedidos selecionados
+- RefundRepository: retorna os reembolsos para os itens de pedido selecionados
+- ChargebackRepository: retorna os chargebacks para os pedidos selecionados
+- SellerRepository: retorna os metadados do vendedor
+- CommissionRepository: retorna as regras de porcentagem de comissão por categoria
+- SettlementRepository: persiste o resultado final do repasse
 
-- OrderRepository: returns orders in the requested period
-- OrderItemRepository: returns items for the selected orders
-- RefundRepository: returns refunds for selected order items
-- ChargebackRepository: returns chargebacks for selected orders
-- SellerRepository: returns seller metadata
-- CommissionRepository: returns commission percentage rules by category
-- SettlementRepository: persists the final settlement result
+Regras de negócio:
 
-Business rules combine:
-
-1. Order items grouped by seller
-2. Gross sales calculation
-3. Refund deduction
-4. Proportional shipping allocation
-5. Category-based commission
-6. Proportional chargeback allocation
-7. Seller risk evaluation
-8. Fixed settlement fee
-9. Net settlement calculation
-10. Global settlement totals
-
-The service should return one settlement per seller and persist the final settlement result.
+1. Agrupar os itens do pedido por vendedor
+2. Calcular as vendas brutas (gross sales)
+3. Deduzir reembolsos
+4. Alocar o frete proporcionalmente
+5. Calcular a comissão baseada na categoria
+6. Alocar chargebacks proporcionalmente
+7. Avaliar o risco do vendedor
+8. Aplicar a taxa fixa de repasse
+9. Calcular o repasse líquido (net settlement)
+10. Calcular os totais globais de repasse
+11. Retornar um repasse por vendedor
+12. Persistir o resultado final do repasse

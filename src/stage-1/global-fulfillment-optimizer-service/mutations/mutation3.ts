@@ -14,6 +14,10 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
+// não filtra stock com quantidade zero
+
+// 6. Ignores stock positions with zero quantity
+
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }

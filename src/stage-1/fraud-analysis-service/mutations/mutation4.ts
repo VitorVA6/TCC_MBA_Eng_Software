@@ -8,6 +8,8 @@ import {
   AuditLogger
 } from '../contract/interfaces';
 
+// notifica REVIEW como BLOCKED
+
 export class FraudAnalysisService {
   constructor(
     private userRepository: UserRepository,

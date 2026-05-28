@@ -8,6 +8,8 @@ import {
   AuditLogger
 } from '../contract/interfaces';
 
+// ignora histórico
+
 export class FraudAnalysisService {
   constructor(
     private userRepository: UserRepository,
