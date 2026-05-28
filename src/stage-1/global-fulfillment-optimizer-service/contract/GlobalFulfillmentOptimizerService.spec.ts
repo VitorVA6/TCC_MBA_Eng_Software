@@ -9,17 +9,17 @@ import {
   Order,
   StockPosition,
   Warehouse,
-  RouteEdge
+  RouteEdge,
 } from './interfaces';
 
 describe('GlobalFulfillmentOptimizerService', () => {
-  let service: GlobalFulfillmentOptimizerService;
   let orderRepository: jest.Mocked<OrderRepository>;
   let stockRepository: jest.Mocked<StockRepository>;
   let warehouseRepository: jest.Mocked<WarehouseRepository>;
   let routeRepository: jest.Mocked<RouteRepository>;
   let fulfillmentPlanRepository: jest.Mocked<FulfillmentPlanRepository>;
   let eventBus: jest.Mocked<EventBus>;
+  let service: GlobalFulfillmentOptimizerService;
 
   beforeEach(() => {
     orderRepository = { findById: jest.fn() };
@@ -39,336 +39,405 @@ describe('GlobalFulfillmentOptimizerService', () => {
     );
   });
 
-  const createBaseOrder = (): Order => ({
-    id: 'ORDER-123',
+  const createOrder = (overrides?: Partial<Order>): Order => ({
+    id: 'O1',
     status: 'PAID',
-    destinationNode: 'DEST-1',
-    maxDeliveryDays: 5,
-    items: [{ productId: 'PROD-A', quantity: 10, unitWeightKg: 1.5 }],
+    destinationNode: 'DEST1',
+    maxDeliveryDays: 10,
+    items: [{ productId: 'P1', quantity: 10, unitWeightKg: 1 }],
+    ...overrides,
   });
 
-  describe('Order status validation', () => {
-    it('1. Returns NOT_FULFILLED when order does not exist', async () => {
-      orderRepository.findById.mockResolvedValue(null);
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
-      expect(result.totalCost).toBe(0);
-      expect(eventBus.publish).not.toHaveBeenCalled();
-    });
+  const createStock = (overrides?: Partial<StockPosition>): StockPosition => ({
+    warehouseId: 'W1',
+    productId: 'P1',
+    quantity: 100,
+    ...overrides,
+  });
 
-    it('2. Returns NOT_FULFILLED for PENDING orders', async () => {
-      orderRepository.findById.mockResolvedValue({ ...createBaseOrder(), status: 'PENDING' });
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
-    });
+  const createWarehouse = (overrides?: Partial<Warehouse>): Warehouse => ({
+    id: 'W1',
+    active: true,
+    ...overrides,
+  });
 
-    it('3. Returns NOT_FULFILLED for CANCELLED orders', async () => {
-      orderRepository.findById.mockResolvedValue({ ...createBaseOrder(), status: 'CANCELLED' });
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
+  const createRouteEdge = (overrides?: Partial<RouteEdge>): RouteEdge => ({
+    id: 'R1',
+    fromNode: 'W1',
+    toNode: 'DEST1',
+    active: true,
+    fixedCost: 10,
+    costPerKg: 1,
+    maxWeightKg: 1000,
+    deliveryDays: 1,
+    ...overrides,
+  });
+
+  it('1. Deve retornar NOT_FULFILLED quando o pedido não existir', async () => {
+    orderRepository.findById.mockResolvedValue(null);
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+    expect(result.totalCost).toBe(0);
+    expect(result.allocations).toEqual([]);
+    expect(result.shipments).toEqual([]);
+    expect(result.unfulfilledItems).toEqual([]);
+  });
+
+  it('2. Deve retornar NOT_FULFILLED para pedidos PENDING', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({ status: 'PENDING' }));
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+  });
+
+  it('3. Deve retornar NOT_FULFILLED para pedidos CANCELLED', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({ status: 'CANCELLED' }));
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+  });
+
+  it('4. Deve buscar o estoque usando todos os ids únicos de produto do pedido', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [
+        { productId: 'P1', quantity: 1, unitWeightKg: 1 },
+        { productId: 'P2', quantity: 1, unitWeightKg: 1 },
+        { productId: 'P1', quantity: 1, unitWeightKg: 1 },
+      ]
+    }));
+    stockRepository.getStock.mockResolvedValue([]);
+    warehouseRepository.getWarehouses.mockResolvedValue([]);
+    routeRepository.getEdges.mockResolvedValue([]);
+
+    await service.execute({ orderId: 'O1' });
+    expect(stockRepository.getStock).toHaveBeenCalledWith(expect.arrayContaining(['P1', 'P2']));
+    expect(stockRepository.getStock.mock.calls[0][0].length).toBe(2);
+  });
+
+  it('5. Deve ignorar o estoque de armazéns inativos e 6. Deve ignorar as posições de estoque com quantidade zero', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ warehouseId: 'W_INACTIVE', quantity: 10 }),
+      createStock({ warehouseId: 'W_ZERO', quantity: 0 }),
+      createStock({ warehouseId: 'W_ACTIVE', quantity: 10 }),
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({ id: 'W_INACTIVE', active: false }),
+      createWarehouse({ id: 'W_ZERO', active: true }),
+      createWarehouse({ id: 'W_ACTIVE', active: true }),
+    ]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fromNode: 'W_INACTIVE' }),
+      createRouteEdge({ fromNode: 'W_ZERO' }),
+      createRouteEdge({ fromNode: 'W_ACTIVE' }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('FULFILLED');
+    expect(result.allocations).toEqual([
+      expect.objectContaining({ warehouseId: 'W_ACTIVE', quantity: 10 })
+    ]);
+  });
+
+  it('7. Deve ignorar arestas de rota inativas', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ active: false }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+  });
+
+  it('8. Deve encontrar uma rota válida com múltiplos saltos (multi-hop) do armazém até o destino', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ id: 'E1', fromNode: 'W1', toNode: 'NODE_A' }),
+      createRouteEdge({ id: 'E2', fromNode: 'NODE_A', toNode: 'DEST1' }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('FULFILLED');
+    expect(result.shipments[0].path).toEqual(['W1', 'NODE_A', 'DEST1']);
+  });
+
+  it('9. Deve ignorar rotas cuja maxWeightKg seja menor que o peso total do envio', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [{ productId: 'P1', quantity: 10, unitWeightKg: 5 }] // Total weight = 50
+    }));
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ maxWeightKg: 40 }), // 40 < 50
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+  });
+
+  it('10. Deve ignorar rotas cujos deliveryDays totais excedam os maxDeliveryDays do pedido', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({ maxDeliveryDays: 2 }));
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fromNode: 'W1', toNode: 'N1', deliveryDays: 2 }),
+      createRouteEdge({ fromNode: 'N1', toNode: 'DEST1', deliveryDays: 1 }), // Total 3
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+  });
+
+  it('11. Deve agrupar as alocações por armazém e 12. Deve calcular o totalWeightKg do envio corretamente', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [
+        { productId: 'P1', quantity: 5, unitWeightKg: 1 },
+        { productId: 'P2', quantity: 5, unitWeightKg: 2 },
+      ]
+    }));
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ productId: 'P1', warehouseId: 'W1', quantity: 5 }),
+      createStock({ productId: 'P2', warehouseId: 'W1', quantity: 5 }),
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.shipments.length).toBe(1);
+    expect(result.shipments[0].warehouseId).toBe('W1');
+    expect(result.shipments[0].totalWeightKg).toBe(15); // 5*1 + 5*2
+  });
+
+  it('13. Deve calcular o custo da rota como a soma do fixedCost mais o costPerKg vezes o peso do envio para cada aresta no caminho', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [{ productId: 'P1', quantity: 10, unitWeightKg: 2 }] // Weight = 20
+    }));
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ id: 'E1', fromNode: 'W1', toNode: 'N1', fixedCost: 10, costPerKg: 1 }), // 10 + 1*20 = 30
+      createRouteEdge({ id: 'E2', fromNode: 'N1', toNode: 'DEST1', fixedCost: 5, costPerKg: 2 }), // 5 + 2*20 = 45. Total = 75
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.shipments[0].cost).toBe(75);
+    expect(result.totalCost).toBe(75);
+  });
+
+  it('14. Deve minimizar o custo total globalmente e 15. Não deve usar a alocação gulosa (greedy) por item quando esta produzir um custo total maior', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [
+        { productId: 'P1', quantity: 1, unitWeightKg: 10 },
+        { productId: 'P2', quantity: 1, unitWeightKg: 10 },
+      ]
+    }));
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ warehouseId: 'W1', productId: 'P1', quantity: 1 }),
+      createStock({ warehouseId: 'W1', productId: 'P2', quantity: 1 }),
+      createStock({ warehouseId: 'W2', productId: 'P1', quantity: 1 }),
+      createStock({ warehouseId: 'W2', productId: 'P2', quantity: 1 }),
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({ id: 'W1' }),
+      createWarehouse({ id: 'W2' }),
+    ]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fromNode: 'W1', fixedCost: 100, costPerKg: 1 }),
+      createRouteEdge({ fromNode: 'W2', fixedCost: 0, costPerKg: 10 }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.totalCost).toBe(120); // W1 is 100 + (20 * 1) = 120. W2 would be 0 + (20 * 10) = 200.
+    expect(result.allocations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ warehouseId: 'W1', productId: 'P1' }),
+      expect.objectContaining({ warehouseId: 'W1', productId: 'P2' })
+    ]));
+  });
+
+  it('16. Deve suportar a divisão do atendimento em múltiplos armazéns quando necessário', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [
+        { productId: 'P1', quantity: 5, unitWeightKg: 1 },
+        { productId: 'P2', quantity: 5, unitWeightKg: 1 },
+      ]
+    }));
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ warehouseId: 'W1', productId: 'P1', quantity: 5 }),
+      createStock({ warehouseId: 'W2', productId: 'P2', quantity: 5 }),
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({ id: 'W1' }),
+      createWarehouse({ id: 'W2' }),
+    ]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fromNode: 'W1' }),
+      createRouteEdge({ fromNode: 'W2' }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('FULFILLED');
+    expect(result.shipments.length).toBe(2);
+    expect(result.allocations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ warehouseId: 'W1', productId: 'P1' }),
+      expect.objectContaining({ warehouseId: 'W2', productId: 'P2' }),
+    ]));
+  });
+
+  it('17. Deve preferir o atendimento total ao invés do atendimento parcial mais barato', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [
+        { productId: 'P1', quantity: 1, unitWeightKg: 1 },
+        { productId: 'P2', quantity: 1, unitWeightKg: 1 },
+      ]
+    }));
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ warehouseId: 'W_CHEAP', productId: 'P1', quantity: 1 }), // Only P1
+      createStock({ warehouseId: 'W_EXPENSIVE', productId: 'P1', quantity: 1 }),
+      createStock({ warehouseId: 'W_EXPENSIVE', productId: 'P2', quantity: 1 }), // Both
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({ id: 'W_CHEAP' }),
+      createWarehouse({ id: 'W_EXPENSIVE' }),
+    ]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fromNode: 'W_CHEAP', fixedCost: 1, costPerKg: 0 }),
+      createRouteEdge({ fromNode: 'W_EXPENSIVE', fixedCost: 1000, costPerKg: 0 }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('FULFILLED');
+    expect(result.totalCost).toBe(1000); // Prioritize FULFILLED over PARTIALLY_FULFILLED
+  });
+
+  it('18. Deve retornar PARTIALLY_FULFILLED quando apenas parte do pedido puder ser atendida', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [{ productId: 'P1', quantity: 10, unitWeightKg: 1 }]
+    }));
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ quantity: 5 }) // Only 5 out of 10 available
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('PARTIALLY_FULFILLED');
+    expect(result.allocations[0].quantity).toBe(5);
+  });
+
+  it('19. Deve retornar NOT_FULFILLED quando nenhum item puder ser atendido', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('NOT_FULFILLED');
+  });
+
+  it('20. Deve relatar os itens não atendidos com requestedQuantity e fulfilledQuantity', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [{ productId: 'P1', quantity: 10, unitWeightKg: 1 }]
+    }));
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ quantity: 4 })
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.unfulfilledItems).toEqual([
+      { productId: 'P1', requestedQuantity: 10, fulfilledQuantity: 4 }
+    ]);
+  });
+
+  it('21. Deve usar um desempate determinístico quando dois planos tiverem a mesma quantidade atendida e o mesmo custo total', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([
+      createStock({ warehouseId: 'W2' }),
+      createStock({ warehouseId: 'W1' }),
+    ]);
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({ id: 'W1' }),
+      createWarehouse({ id: 'W2' }),
+    ]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fromNode: 'W1' }),
+      createRouteEdge({ fromNode: 'W2' }),
+    ]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    const result2 = await service.execute({ orderId: 'O1' });
+    
+    // Result should be consistent between calls despite identical conditions
+    expect(result.allocations[0].warehouseId).toBe(result2.allocations[0].warehouseId);
+  });
+
+  it('22. Deve salvar o mesmo resultado retornado pelo método execute', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(fulfillmentPlanRepository.save).toHaveBeenCalledWith(result);
+  });
+
+  it('23. Deve publicar fulfillment.optimized quando totalmente atendido', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
+
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('FULFILLED');
+    expect(eventBus.publish).toHaveBeenCalledWith('fulfillment.optimized', {
+      orderId: result.orderId,
     });
   });
 
-  describe('Data fetching and filtering', () => {
-    it('4. Fetches stock using all unique product ids from the order', async () => {
-      const order = createBaseOrder();
-      order.items.push({ productId: 'PROD-B', quantity: 5, unitWeightKg: 2.0 });
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([]);
-      routeRepository.getEdges.mockResolvedValue([]);
-      stockRepository.getStock.mockResolvedValue([]);
+  it('24. Deve publicar fulfillment.partial quando parcialmente atendido', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [{ productId: 'P1', quantity: 10, unitWeightKg: 1 }]
+    }));
+    stockRepository.getStock.mockResolvedValue([createStock({ quantity: 5 })]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
 
-      await service.execute({ orderId: 'ORDER-123' });
-      expect(stockRepository.getStock).toHaveBeenCalledWith(['PROD-A', 'PROD-B']);
-    });
-
-    it('5. Ignores stock from inactive warehouses & 6. Ignores stock positions with zero quantity', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder());
-      warehouseRepository.getWarehouses.mockResolvedValue([
-        { id: 'WH-ACTIVE', active: true },
-        { id: 'WH-INACTIVE', active: false },
-      ]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-ACTIVE', productId: 'PROD-A', quantity: 0 }, // zero quantity
-        { warehouseId: 'WH-INACTIVE', productId: 'PROD-A', quantity: 100 }, // inactive WH
-      ]);
-      routeRepository.getEdges.mockResolvedValue([]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
-    });
-
-    it('7. Ignores inactive route edges & 8. Finds a valid multi-hop route from warehouse to destination', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder()); // DEST-1
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'NODE-A', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-        { id: 'E2', fromNode: 'NODE-A', toNode: 'DEST-1', active: false, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 }, // Inactive hop
-        { id: 'E3', fromNode: 'NODE-A', toNode: 'DEST-1', active: true, fixedCost: 5, costPerKg: 2, maxWeightKg: 100, deliveryDays: 2 }, // Active alternative
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('FULFILLED');
-      expect(result.shipments[0].path).toEqual(['WH-1', 'NODE-A', 'DEST-1']);
+    const result = await service.execute({ orderId: 'O1' });
+    expect(result.status).toBe('PARTIALLY_FULFILLED');
+    expect(eventBus.publish).toHaveBeenCalledWith('fulfillment.partial', {
+      orderId: result.orderId,
     });
   });
 
-  describe('Route and constraint validation', () => {
-    it('9. Ignores routes whose maxWeightKg is smaller than shipment total weight', async () => {
-      const order = createBaseOrder(); // 10 items * 1.5kg = 15kg
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 10, deliveryDays: 1 }, // Too small
-      ]);
+  it('25. Não deve publicar o evento quando nada for atendido', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder());
+    stockRepository.getStock.mockResolvedValue([]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([createRouteEdge()]);
 
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
-    });
-
-    it('10. Ignores routes whose total deliveryDays exceeds order maxDeliveryDays', async () => {
-      const order = createBaseOrder(); // maxDeliveryDays: 5
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 6 }, // Too slow
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
-    });
+    await service.execute({ orderId: 'O1' });
+    expect(eventBus.publish).not.toHaveBeenCalled();
   });
 
-  describe('Calculation and optimization', () => {
-    it('11. Groups allocations by warehouse, 12. Calculates shipment totalWeightKg correctly, & 13. Calculates route cost (sum(fixed + costPerKg * weight))', async () => {
-      const order = createBaseOrder();
-      order.items.push({ productId: 'PROD-B', quantity: 2, unitWeightKg: 2.5 }); // total weight: 10*1.5 + 2*2.5 = 20kg
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 },
-        { warehouseId: 'WH-1', productId: 'PROD-B', quantity: 2 },
-      ]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'NODE-A', active: true, fixedCost: 10, costPerKg: 0.5, maxWeightKg: 100, deliveryDays: 1 },
-        { id: 'E2', fromNode: 'NODE-A', toNode: 'DEST-1', active: true, fixedCost: 5, costPerKg: 1.5, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
+  it('26. Deve arredondar os campos monetários e de peso finais para 2 casas decimais', async () => {
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [{ productId: 'P1', quantity: 3, unitWeightKg: 1.33333 }] // Total requested weight: ~3.99999
+    }));
+    stockRepository.getStock.mockResolvedValue([createStock()]);
+    warehouseRepository.getWarehouses.mockResolvedValue([createWarehouse()]);
+    routeRepository.getEdges.mockResolvedValue([
+      createRouteEdge({ fixedCost: 10.123, costPerKg: 1.456 }),
+    ]);
 
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.allocations.length).toBe(2);
-      expect(result.shipments.length).toBe(1);
-      expect(result.shipments[0].warehouseId).toBe('WH-1');
-      expect(result.shipments[0].totalWeightKg).toBe(20.00); // 15 + 5
-
-      // Cost E1: 10 + (0.5 * 20) = 20
-      // Cost E2: 5 + (1.5 * 20) = 35
-      // Total cost = 55
-      expect(result.totalCost).toBe(55.00);
-      expect(result.shipments[0].cost).toBe(55.00);
-    });
-
-    it('14. Minimizes total cost globally & 15. Does not use greedy per-item allocation when it produces higher total cost', async () => {
-      const order = createBaseOrder(); // 1 item: 10 of A, weight 15kg
-      order.items.push({ productId: 'PROD-B', quantity: 5, unitWeightKg: 1 }); // 5 of B, weight 5kg
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([
-        { id: 'WH-1', active: true },
-        { id: 'WH-2', active: true }
-      ]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 },
-        { warehouseId: 'WH-1', productId: 'PROD-B', quantity: 5 },
-        { warehouseId: 'WH-2', productId: 'PROD-B', quantity: 5 },
-      ]);
-      
-      routeRepository.getEdges.mockResolvedValue([
-        // WH-1 route: Fixed 100, perKg 1. (Consolidated cost = 100 + 1 * 20kg = 120)
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 100, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-        // WH-2 route: Fixed 10, perKg 1. (Split cost for B = 10 + 1 * 5kg = 15. But splitting means WH-1 sends A for 100 + 1*15kg = 115. Total = 130)
-        { id: 'E2', fromNode: 'WH-2', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      // Greedy would pick WH-2 for PROD-B because route E2 is cheaper than E1 for that item individually.
-      // But globally, grouping everything in WH-1 (cost 120) is cheaper than splitting (cost 130).
-      expect(result.shipments.length).toBe(1);
-      expect(result.shipments[0].warehouseId).toBe('WH-1');
-      expect(result.totalCost).toBe(120.00);
-    });
-
-    it('16. Supports splitting fulfillment across multiple warehouses when necessary', async () => {
-      const order = createBaseOrder();
-      order.items.push({ productId: 'PROD-B', quantity: 5, unitWeightKg: 1 });
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }, { id: 'WH-2', active: true }]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 },
-        { warehouseId: 'WH-2', productId: 'PROD-B', quantity: 5 },
-      ]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-        { id: 'E2', fromNode: 'WH-2', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('FULFILLED');
-      expect(result.shipments.length).toBe(2);
-      expect(result.allocations).toEqual(expect.arrayContaining([
-        { productId: 'PROD-A', warehouseId: 'WH-1', quantity: 10 },
-        { productId: 'PROD-B', warehouseId: 'WH-2', quantity: 5 },
-      ]));
-    });
-
-    it('17. Prefers full fulfillment over cheaper partial fulfillment', async () => {
-      const order = createBaseOrder();
-      order.items.push({ productId: 'PROD-B', quantity: 5, unitWeightKg: 1 });
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }, { id: 'WH-2', active: true }]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 },
-        { warehouseId: 'WH-2', productId: 'PROD-B', quantity: 5 },
-      ]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 1, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 }, // Cheap
-        { id: 'E2', fromNode: 'WH-2', toNode: 'DEST-1', active: true, fixedCost: 9999, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 }, // Very Expensive
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('FULFILLED');
-      expect(result.unfulfilledItems.length).toBe(0);
-      expect(result.totalCost).toBeGreaterThan(9999);
-    });
-
-    it('21. Uses deterministic tie-breaking when two plans have same fulfilled quantity and same total cost', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder());
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-B', active: true }, { id: 'WH-A', active: true }]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-B', productId: 'PROD-A', quantity: 10 },
-        { warehouseId: 'WH-A', productId: 'PROD-A', quantity: 10 },
-      ]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-B', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-        { id: 'E2', fromNode: 'WH-A', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result1 = await service.execute({ orderId: 'ORDER-123' });
-      const result2 = await service.execute({ orderId: 'ORDER-123' });
-      expect(result1.shipments[0].warehouseId).toBe(result2.shipments[0].warehouseId);
-    });
-  });
-
-  describe('Fulfillment statuses & Reporting', () => {
-    it('18. Returns PARTIALLY_FULFILLED when only part of the order can be fulfilled & 20. Reports unfulfilled items', async () => {
-      const order = createBaseOrder();
-      order.items.push({ productId: 'PROD-B', quantity: 5, unitWeightKg: 1 });
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 },
-        { warehouseId: 'WH-1', productId: 'PROD-B', quantity: 2 }, // Only 2 available
-      ]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('PARTIALLY_FULFILLED');
-      expect(result.unfulfilledItems).toContainEqual({
-        productId: 'PROD-B',
-        requestedQuantity: 5,
-        fulfilledQuantity: 2,
-      });
-    });
-
-    it('19. Returns NOT_FULFILLED when no item can be fulfilled', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder());
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([
-        { warehouseId: 'WH-1', productId: 'PROD-A', quantity: 0 },
-      ]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.status).toBe('NOT_FULFILLED');
-      expect(result.unfulfilledItems).toEqual([{ productId: 'PROD-A', requestedQuantity: 10, fulfilledQuantity: 0 }]);
-    });
-  });
-
-  describe('Persistence and Side Effects', () => {
-    it('22. Saves the same result returned by execute', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder());
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(fulfillmentPlanRepository.save).toHaveBeenCalledWith(result);
-    });
-
-    it('23. Publishes fulfillment.optimized when fully fulfilled', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder());
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]);
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      await service.execute({ orderId: 'ORDER-123' });
-
-      expect(eventBus.publish).toHaveBeenCalledWith(
-        'fulfillment.optimized',
-        { orderId: 'ORDER-123' }
-      );
-    });
-
-    it('24. Publishes fulfillment.partial when partially fulfilled', async () => {
-      const order = createBaseOrder();
-      order.items[0].quantity = 20; // Need 20
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]); // Only 10 available
-      routeRepository.getEdges.mockResolvedValue([
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10, costPerKg: 1, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      await service.execute({ orderId: 'ORDER-123' });
-      expect(eventBus.publish).toHaveBeenCalledWith('fulfillment.partial', { orderId: 'ORDER-123' });
-    });
-
-    it('25. Does not publish event when nothing is fulfilled', async () => {
-      orderRepository.findById.mockResolvedValue(createBaseOrder());
-      warehouseRepository.getWarehouses.mockResolvedValue([]);
-      
-      await service.execute({ orderId: 'ORDER-123' });
-      expect(eventBus.publish).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Precision formatting', () => {
-    it('26. Final monetary and weight fields are rounded to 2 decimal places', async () => {
-      const order = createBaseOrder();
-      order.items[0].unitWeightKg = 1.33333; // Will result in 13.3333... weight
-      orderRepository.findById.mockResolvedValue(order);
-      warehouseRepository.getWarehouses.mockResolvedValue([{ id: 'WH-1', active: true }]);
-      stockRepository.getStock.mockResolvedValue([{ warehouseId: 'WH-1', productId: 'PROD-A', quantity: 10 }]);
-      routeRepository.getEdges.mockResolvedValue([
-        // Cost: 10.1234 + (1.1111 * 13.33)
-        { id: 'E1', fromNode: 'WH-1', toNode: 'DEST-1', active: true, fixedCost: 10.1234, costPerKg: 1.1111, maxWeightKg: 100, deliveryDays: 1 },
-      ]);
-
-      const result = await service.execute({ orderId: 'ORDER-123' });
-      expect(result.shipments[0].totalWeightKg).toBe(13.33);
-      
-      const expectedCost = Number((10.1234 + (1.1111 * 13.3333)).toFixed(2));
-      expect(result.shipments[0].cost).toBe(expectedCost);
-      expect(result.totalCost).toBe(expectedCost);
-    });
+    const result = await service.execute({ orderId: 'O1' });
+    
+    // Weight: 3.99999 rounded is 4.00
+    expect(result.shipments[0].totalWeightKg).toBe(4.00);
+    // Cost calculation based on rounded weight: 10.123 + (1.456 * 4.00) = 15.947 rounded is 15.95
+    expect(result.shipments[0].cost).toBe(15.95);
+    expect(result.totalCost).toBe(15.95);
   });
 });
