@@ -6,7 +6,6 @@ import {
   NotificationService,
   AuditLogger,
   TransactionInput,
-  TransactionHistory
 } from './interfaces';
 
 describe('FraudAnalysisService', () => {

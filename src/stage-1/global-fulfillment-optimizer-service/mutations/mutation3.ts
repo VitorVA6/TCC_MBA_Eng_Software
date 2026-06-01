@@ -8,7 +8,6 @@ import {
   FulfillmentOptimizationResult,
   Order,
   StockPosition,
-  Warehouse,
   RouteEdge,
   Allocation,
   ShipmentRoute

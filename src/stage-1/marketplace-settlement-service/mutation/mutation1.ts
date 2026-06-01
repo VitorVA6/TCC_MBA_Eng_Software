@@ -12,7 +12,6 @@ import {
   SettlementRepository,
   SettlementResult,
   SellerSettlement,
-  Order,
   OrderItem,
   Refund,
   Chargeback,
