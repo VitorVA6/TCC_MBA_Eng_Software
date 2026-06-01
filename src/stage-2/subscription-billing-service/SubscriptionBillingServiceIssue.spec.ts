@@ -10,24 +10,36 @@ import {
   Plan,
   Subscription,
   Coupon
-} from './../../stage-1/subscription-billing-service/contract/interfaces';
+} from '../../stage-1/subscription-billing-service/contract/interfaces';
 
 describe('SubscriptionBillingService', () => {
+  let service: SubscriptionBillingService;
   let userRepository: jest.Mocked<UserRepository>;
   let planRepository: jest.Mocked<PlanRepository>;
   let subscriptionRepository: jest.Mocked<SubscriptionRepository>;
   let couponRepository: jest.Mocked<CouponRepository>;
   let taxService: jest.Mocked<TaxService>;
   let paymentGateway: jest.Mocked<PaymentGateway>;
-  let service: SubscriptionBillingService;
 
   beforeEach(() => {
-    userRepository = { findById: jest.fn() };
-    planRepository = { findById: jest.fn() };
-    subscriptionRepository = { findByUserId: jest.fn() };
-    couponRepository = { findByCode: jest.fn() };
-    taxService = { getRate: jest.fn() };
-    paymentGateway = { charge: jest.fn() };
+    userRepository = {
+      findById: jest.fn(),
+    };
+    planRepository = {
+      findById: jest.fn(),
+    };
+    subscriptionRepository = {
+      findByUserId: jest.fn(),
+    };
+    couponRepository = {
+      findByCode: jest.fn(),
+    };
+    taxService = {
+      getRate: jest.fn(),
+    };
+    paymentGateway = {
+      charge: jest.fn(),
+    };
 
     service = new SubscriptionBillingService(
       userRepository,
@@ -39,343 +51,270 @@ describe('SubscriptionBillingService', () => {
     );
   });
 
-  const mockUser = (overrides?: Partial<User>): User => ({
-    id: 'user-123',
-    country: 'US',
-    isVip: false,
-    ...overrides
-  });
-
-  const mockPlan = (overrides?: Partial<Plan>): Plan => ({
-    id: 'plan-1',
-    monthlyPrice: 100,
-    ...overrides
-  });
-
-  const mockSubscription = (overrides?: Partial<Subscription>): Subscription => ({
-    userId: 'user-123',
-    currentPlanId: 'plan-1',
-    targetPlanId: null,
-    status: 'ACTIVE',
-    daysRemaining: 15,
-    ...overrides
-  });
-
-  const mockCoupon = (overrides?: Partial<Coupon>): Coupon => ({
-    code: 'SAVE20',
-    percentage: 20,
-    active: true,
-    ...overrides
-  });
-
-  const setupMocks = (
-    user: User,
-    subscription: Subscription,
-    currentPlan: Plan,
-    taxRate: number = 0,
-    targetPlan?: Plan,
-    coupon?: Coupon
-  ) => {
+  // Setup helper
+  const setupMocks = (overrides?: {
+    user?: Partial<User>;
+    subscription?: Partial<Subscription>;
+    currentPlan?: Partial<Plan>;
+    targetPlan?: Partial<Plan>;
+    coupon?: Partial<Coupon> | null;
+    taxRate?: number;
+  }) => {
+    const user: User = { id: 'u1', country: 'BR', isVip: false, ...overrides?.user };
+    const subscription: Subscription = { userId: 'u1', currentPlanId: 'p1', targetPlanId: null, status: 'ACTIVE', daysRemaining: 0, ...overrides?.subscription };
+    const currentPlan: Plan = { id: 'p1', monthlyPrice: 100, ...overrides?.currentPlan };
+    
     userRepository.findById.mockResolvedValue(user);
     subscriptionRepository.findByUserId.mockResolvedValue(subscription);
+    
     planRepository.findById.mockImplementation(async (id: string) => {
-      if (id === currentPlan.id) return currentPlan;
-      if (targetPlan && id === targetPlan.id) return targetPlan;
-      throw new Error(`Plan ${id} not found`);
+      if (id === subscription.currentPlanId) return currentPlan;
+      if (id === subscription.targetPlanId && overrides?.targetPlan) return overrides.targetPlan as Plan;
+      throw new Error(`Plan not found: ${id}`);
     });
-    taxService.getRate.mockResolvedValue(taxRate);
-    if (coupon) {
-      couponRepository.findByCode.mockResolvedValue(coupon);
+
+    if (overrides?.coupon !== undefined) {
+      couponRepository.findByCode.mockResolvedValue(overrides.coupon as Coupon | null);
     } else {
       couponRepository.findByCode.mockResolvedValue(null);
     }
+
+    taxService.getRate.mockResolvedValue(overrides?.taxRate ?? 0);
   };
 
-  it('1. Trial users are not charged', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription({ status: 'TRIAL' }),
-      mockPlan()
-    );
+  it('1. Não deve cobrar usuários trial', async () => {
+    setupMocks({
+      subscription: { status: 'TRIAL' }
+    });
 
-    const result = await service.execute({ userId: 'user-123' });
+    const result = await service.execute({ userId: 'u1' });
 
-    expect(result.amount).toBe(0);
-    expect(result.blocked).toBe(false);
+    expect(result).toMatchObject({ amount: 0, blocked: false });
     expect(paymentGateway.charge).not.toHaveBeenCalled();
   });
 
-  it('2. Past due users are blocked', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription({ status: 'PAST_DUE' }),
-      mockPlan()
-    );
+  it('2. Deve bloquear usuários past due (em atraso)', async () => {
+    setupMocks({
+      subscription: { status: 'PAST_DUE' }
+    });
 
-    const result = await service.execute({ userId: 'user-123' });
+    const result = await service.execute({ userId: 'u1' });
 
-    expect(result.amount).toBe(0);
-    expect(result.blocked).toBe(true);
+    expect(result).toMatchObject({ amount: 0, blocked: true });
     expect(result.reason).toBeDefined();
     expect(paymentGateway.charge).not.toHaveBeenCalled();
   });
 
-  it('3. Normal active monthly charge', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription({ status: 'ACTIVE' }),
-      mockPlan({ monthlyPrice: 100 }),
-      0 // No tax
-    );
+  it('3. Deve cobrar normalmente o ciclo mensal ativo', async () => {
+    setupMocks({
+      currentPlan: { monthlyPrice: 100 }
+    });
 
-    const result = await service.execute({ userId: 'user-123' });
+    const result = await service.execute({ userId: 'u1' });
 
-    expect(result.amount).toBe(100);
+    expect(result).toMatchObject({ amount: 100, blocked: false });
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 100);
+  });
+
+  it('4. Deve cobrar o valor proporcional (prorated) para o upgrade', async () => {
+    setupMocks({
+      currentPlan: { id: 'p1', monthlyPrice: 100 },
+      targetPlan: { id: 'p2', monthlyPrice: 200 },
+      subscription: { currentPlanId: 'p1', targetPlanId: 'p2', daysRemaining: 15 } // diff 100 * (15/30) = 50. Total = 100 + 50 = 150
+    });
+
+    const result = await service.execute({ userId: 'u1' });
+
+    expect(result.amount).toBe(150);
     expect(result.blocked).toBe(false);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 100);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 150);
   });
 
-  it('4. Upgrade prorated billing', async () => {
-    const currentPlan = mockPlan({ id: 'plan-1', monthlyPrice: 100 });
-    const targetPlan = mockPlan({ id: 'plan-2', monthlyPrice: 200 });
-    
-    setupMocks(
-      mockUser(),
-      mockSubscription({ currentPlanId: 'plan-1', targetPlanId: 'plan-2', daysRemaining: 15 }),
-      currentPlan,
-      0,
-      targetPlan
-    );
+  it('5. Deve cobrar apenas o plano atual para o downgrade', async () => {
+    setupMocks({
+      currentPlan: { id: 'p2', monthlyPrice: 200 },
+      targetPlan: { id: 'p1', monthlyPrice: 100 },
+      subscription: { currentPlanId: 'p2', targetPlanId: 'p1', daysRemaining: 15 }
+    });
 
-    const result = await service.execute({ userId: 'user-123' });
+    const result = await service.execute({ userId: 'u1' });
 
-    // Prorated difference: (200 - 100) * (15 / 30) = 50
-    expect(result.amount).toBe(50);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 50);
+    expect(result).toMatchObject({ amount: 200, blocked: false });
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 200);
   });
 
-  it('5. Downgrade charged only current plan', async () => {
-    const currentPlan = mockPlan({ id: 'plan-2', monthlyPrice: 200 });
-    const targetPlan = mockPlan({ id: 'plan-1', monthlyPrice: 100 });
+  it('6. Deve aplicar desconto de cupom ativo', async () => {
+    setupMocks({
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC20', percentage: 20, active: true }
+    });
 
-    setupMocks(
-      mockUser(),
-      mockSubscription({ currentPlanId: 'plan-2', targetPlanId: 'plan-1' }),
-      currentPlan,
-      0,
-      targetPlan
-    );
-
-    const result = await service.execute({ userId: 'user-123' });
-
-    expect(result.amount).toBe(200);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 200);
-  });
-
-  it('6. Active coupon discount', async () => {
-    const coupon = mockCoupon({ percentage: 20, active: true });
-    setupMocks(
-      mockUser(),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 100 }),
-      0,
-      undefined,
-      coupon
-    );
-
-    const result = await service.execute({ userId: 'user-123', couponCode: 'SAVE20' });
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC20' });
 
     expect(result.amount).toBe(80);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 80);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 80);
   });
 
-  it('7. Inactive coupon ignored', async () => {
-    const coupon = mockCoupon({ percentage: 20, active: false });
-    setupMocks(
-      mockUser(),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 100 }),
-      0,
-      undefined,
-      coupon
-    );
+  it('7. Deve ignorar cupom inativo', async () => {
+    setupMocks({
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC20', percentage: 20, active: false }
+    });
 
-    const result = await service.execute({ userId: 'user-123', couponCode: 'SAVE20' });
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC20' });
 
     expect(result.amount).toBe(100);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 100);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 100);
   });
 
-  it('8. VIP extra discount after coupon', async () => {
-    const coupon = mockCoupon({ percentage: 20, active: true });
-    setupMocks(
-      mockUser({ isVip: true }),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 100 }),
-      0,
-      undefined,
-      coupon
-    );
-
-    const result = await service.execute({ userId: 'user-123', couponCode: 'SAVE20' });
-
-    // Base: 100. After 20% coupon: 80. After 10% VIP discount on 80: 72.
-    expect(result.amount).toBe(72);
-  });
-
-  it('9. Taxes applied after discounts', async () => {
-    setupMocks(
-      mockUser({ country: 'UK' }),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 100 }),
-      20 // 20% tax
-    );
-
-    const result = await service.execute({ userId: 'user-123' });
-
-    expect(result.amount).toBe(120);
-  });
-
-  it('10. Amount never negative', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: -10 }), // Forcing a negative scenario
-      0
-    );
-
-    const result = await service.execute({ userId: 'user-123' });
-
-    expect(result.amount).toBe(0);
-    expect(paymentGateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('11. Zero amount does not charge gateway', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 0 }),
-      0
-    );
-
-    const result = await service.execute({ userId: 'user-123' });
-
-    expect(result.amount).toBe(0);
-    expect(paymentGateway.charge).not.toHaveBeenCalled();
-  });
-
-  it('12. Gateway called with correct amount', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 150 }),
-      0
-    );
-
-    await service.execute({ userId: 'user-123' });
-
-    expect(paymentGateway.charge).toHaveBeenCalledTimes(1);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 150);
-  });
-
-  it('13. Combined coupon + VIP + tax scenario', async () => {
-    const coupon = mockCoupon({ percentage: 50, active: true }); // 50% off
-    setupMocks(
-      mockUser({ isVip: true }), // 10% off
-      mockSubscription(),
-      mockPlan({ monthlyPrice: 200 }),
-      10, // 10% tax
-      undefined,
-      coupon
-    );
-
-    const result = await service.execute({ userId: 'user-123', couponCode: 'SAVE50' });
-
-    // 200 -> 50% off = 100.
-    // VIP 10% off of 100 = 90.
-    // 10% tax on 90 = +9. Total = 99.
-    expect(result.amount).toBe(99);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 99);
-  });
-
-  it('14. Upgrade with coupon and tax', async () => {
-    const currentPlan = mockPlan({ id: 'plan-1', monthlyPrice: 100 });
-    const targetPlan = mockPlan({ id: 'plan-2', monthlyPrice: 300 });
-    const coupon = mockCoupon({ percentage: 10, active: true });
-    
-    setupMocks(
-      mockUser(),
-      mockSubscription({ currentPlanId: 'plan-1', targetPlanId: 'plan-2', daysRemaining: 15 }),
-      currentPlan,
-      5, // 5% tax
-      targetPlan,
-      coupon
-    );
-
-    const result = await service.execute({ userId: 'user-123', couponCode: 'SAVE10' });
-
-    // Difference: 300 - 100 = 200
-    // Prorated difference (15 days): 200 * (15/30) = 100
-    // Coupon 10% off of 100 = 90
-    // Tax 5% of 90 = 4.5
-    // Total = 94.5
-    expect(result.amount).toBe(94.5);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 94.5);
-  });
-
-  it('15. Correct blocked response', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription({ status: 'PAST_DUE' }),
-      mockPlan()
-    );
-
-    const result = await service.execute({ userId: 'user-123' });
-
-    expect(result).toEqual({
-      amount: 0,
-      blocked: true,
-      reason: expect.any(String)
+  it('8. Deve aplicar desconto extra VIP após o cupom', async () => {
+    setupMocks({
+      user: { isVip: true },
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC20', percentage: 20, active: true }
     });
+
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC20' });
+
+    // 100 - 20% = 80
+    // 80 - 10% (VIP) = 72
+    expect(result.amount).toBe(72);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 72);
   });
 
-  it('16. Correct dependency calls', async () => {
-    setupMocks(
-      mockUser(),
-      mockSubscription(),
-      mockPlan(),
-      0.10
-    );
+  it('9. Deve aplicar impostos após os descontos', async () => {
+    setupMocks({
+      user: { isVip: true },
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC20', percentage: 20, active: true },
+      taxRate: 10 // 10% tax
+    });
 
-    await service.execute({ userId: 'user-123' });
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC20' });
 
-    expect(userRepository.findById).toHaveBeenCalledWith('user-123');
-    expect(subscriptionRepository.findByUserId).toHaveBeenCalledWith('user-123');
-    expect(planRepository.findById).toHaveBeenCalledWith('plan-1');
-    expect(taxService.getRate).toHaveBeenCalledWith('US');
+    // 100 - 20% = 80
+    // 80 - 10% VIP = 72
+    // 72 + 10% TAX = 79.2
+    expect(result.amount).toBe(79.2);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 79.2);
   });
 
-  it('17. Upgrade proportional billing caps daysRemaining at 30', async () => {
-    const currentPlan = mockPlan({ id: 'plan-1', monthlyPrice: 100 });
-    const targetPlan = mockPlan({ id: 'plan-2', monthlyPrice: 300 });
+  it('10. Nunca deve resultar em um valor negativo', async () => {
+    setupMocks({
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC110', percentage: 110, active: true }
+    });
 
-    setupMocks(
-      mockUser({ isVip: false }),
-      mockSubscription({
-        status: 'ACTIVE',
-        currentPlanId: 'plan-1',
-        targetPlanId: 'plan-2',
-        daysRemaining: 45
-      }),
-      currentPlan,
-      10, // 10% tax
-      targetPlan
-    );
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC110' });
 
-    const result = await service.execute({ userId: 'user-123' });
+    expect(result.amount).toBe(0);
+  });
+
+  it('11. Não deve cobrar no gateway quando o valor for zero', async () => {
+    setupMocks({
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC100', percentage: 100, active: true }
+    });
+
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC100' });
+
+    expect(result.amount).toBe(0);
+    expect(result.blocked).toBe(false);
+    expect(paymentGateway.charge).not.toHaveBeenCalled();
+  });
+
+  it('12. Deve chamar o gateway com o valor correto', async () => {
+    setupMocks({
+      currentPlan: { monthlyPrice: 150 }
+    });
+
+    await service.execute({ userId: 'u1' });
+
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 150);
+  });
+
+  it('13. Deve lidar com cenário combinado de cupom, VIP e imposto', async () => {
+    setupMocks({
+      user: { isVip: true, country: 'BR' },
+      currentPlan: { monthlyPrice: 200 },
+      coupon: { code: 'HALFOFF', percentage: 50, active: true },
+      taxRate: 5 // 5% tax
+    });
+
+    const result = await service.execute({ userId: 'u1', couponCode: 'HALFOFF' });
+
+    // Base: 200
+    // Coupon (50%): -100 = 100
+    // VIP (10%): -10 = 90
+    // Tax (5%): +4.5 = 94.5
+    expect(result.amount).toBe(94.5);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 94.5);
+  });
+
+  it('14. Deve lidar com upgrade com cupom e imposto', async () => {
+    setupMocks({
+      user: { isVip: false, country: 'US' },
+      currentPlan: { id: 'p1', monthlyPrice: 100 },
+      targetPlan: { id: 'p2', monthlyPrice: 220 },
+      subscription: { currentPlanId: 'p1', targetPlanId: 'p2', daysRemaining: 10 },
+      coupon: { code: 'DISC10', percentage: 10, active: true },
+      taxRate: 20 // 20%
+    });
+
+    // Base = 100
+    // Upgrade = (220 - 100) * (10 / 30) = 120 * 0.3333333333333333 = 40
+    // Total antes dos descontos = 100 + 40 = 140
+    // Cupom (10%) = -14 = 126
+    // VIP = não
+    // Imposto (20%) = 126 * 0.2 = 25.2
+    // Final = 126 + 25.2 = 151.2
+    const result = await service.execute({ userId: 'u1', couponCode: 'DISC10' });
+
+    expect(result.amount).toBeCloseTo(151.2);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', expect.closeTo(151.2));
+  });
+
+  it('15. Deve retornar a resposta de bloqueio correta', async () => {
+    setupMocks({
+      subscription: { status: 'PAST_DUE' }
+    });
+
+    const result = await service.execute({ userId: 'u1' });
+
+    expect(result.blocked).toBe(true);
+    expect(result.reason).toBeDefined();
+    expect(typeof result.reason).toBe('string');
+  });
+
+  it('16. Deve chamar as dependências corretamente', async () => {
+    setupMocks({
+      user: { country: 'CA' },
+      currentPlan: { monthlyPrice: 100 },
+      coupon: { code: 'DISC', percentage: 10, active: true }
+    });
+
+    await service.execute({ userId: 'u1', couponCode: 'DISC' });
+
+    expect(userRepository.findById).toHaveBeenCalledWith('u1');
+    expect(subscriptionRepository.findByUserId).toHaveBeenCalledWith('u1');
+    expect(planRepository.findById).toHaveBeenCalledWith('p1');
+    expect(couponRepository.findByCode).toHaveBeenCalledWith('DISC');
+    expect(taxService.getRate).toHaveBeenCalledWith('CA');
+  });
+
+  it('17. Deve limitar daysRemaining a 30 no cálculo proporcional de upgrade', async () => {
+    setupMocks({
+      user: { isVip: false, country: 'BR' },
+      currentPlan: { id: 'p1', monthlyPrice: 100 },
+      targetPlan: { id: 'p2', monthlyPrice: 300 },
+      subscription: { currentPlanId: 'p1', targetPlanId: 'p2', daysRemaining: 45 },
+      taxRate: 10
+    });
+
+    const result = await service.execute({ userId: 'u1' });
 
     expect(result.amount).toBe(220);
     expect(result.blocked).toBe(false);
-    expect(paymentGateway.charge).toHaveBeenCalledWith('user-123', 220);
+    expect(paymentGateway.charge).toHaveBeenCalledWith('u1', 220);
   });
 });

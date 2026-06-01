@@ -227,4 +227,23 @@ describe('LedgerReconciliationService', () => {
     expect(result.duplicatedBank).toEqual(['ref-dup']);
     expect(result.matched).not.toContain('ref-dup');
   });
+
+  it('13. Deve registrar divergência de valor mesmo quando houver lançamentos bancários duplicados', async () => {
+    const internalEntries: InternalEntry[] = [
+      { id: '1', reference: 'PAY-001', amount: 100, date: '2023-01-10' },
+    ];
+    const bankEntries: BankEntry[] = [
+      { id: 'b1', reference: 'PAY-001', amount: 90, date: '2023-01-10' },
+      { id: 'b2', reference: 'PAY-001', amount: 90, date: '2023-01-10' },
+    ];
+
+    internalRepositoryMock.getEntries.mockResolvedValue(internalEntries);
+    bankProviderMock.getEntries.mockResolvedValue(bankEntries);
+
+    const result = await service.execute({ startDate, endDate });
+
+    expect(result.duplicatedBank).toContain('PAY-001');
+    expect(result.amountMismatch).toContain('PAY-001');
+    expect(result.matched).not.toContain('PAY-001');
+  });
 });

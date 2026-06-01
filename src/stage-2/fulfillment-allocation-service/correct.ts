@@ -251,7 +251,6 @@ export class FulfillmentAllocationService {
     if (status === 'PARTIALLY_FULFILLED') {
       await this.eventBus.publish('fulfillment.partial', {
         orderId: order.id,
-        unfulfilledItems
       });
     }
 
