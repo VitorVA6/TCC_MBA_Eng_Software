@@ -33,7 +33,11 @@ export class RegisterUserService {
       throw new Error('Email already registered');
     }
 
-    let created: User;
+    let created: User = {
+      id: '0',
+      name,
+      email
+    };
     try {
       created = await this.userRepository.save({
         name,
@@ -51,7 +55,7 @@ export class RegisterUserService {
     return {
       name,
       email,
-      id: '1',
+      id: created.id,
     };
   }
 }

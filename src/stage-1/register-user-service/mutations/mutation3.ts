@@ -23,10 +23,6 @@ export class RegisterUserService {
       throw new Error('Invalid name');
     }
 
-    if (!email) {
-      throw new Error('Invalid email');
-    }
-
     const existing = await this.userRepository.findByEmail(email);
 
     if (existing) {
