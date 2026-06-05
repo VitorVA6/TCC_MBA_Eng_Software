@@ -75,11 +75,7 @@ export class LedgerReconciliationService {
       }
     }
 
-    await this.auditLogger.log({
-      startDate: input.startDate,
-      endDate: input.endDate,
-      summary: result
-    });
+    await this.auditLogger.log(result);
 
     return result;
   }

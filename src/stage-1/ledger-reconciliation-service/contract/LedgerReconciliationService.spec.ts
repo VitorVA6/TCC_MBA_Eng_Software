@@ -1,4 +1,4 @@
-import { LedgerReconciliationService } from '../solution/correct';
+import { LedgerReconciliationService } from '../mutations/mutation3';
 import {
   InternalLedgerRepository,
   BankStatementProvider,

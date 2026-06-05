@@ -5,8 +5,6 @@ import {
   ReconciliationResult
 } from '../contract/interfaces';
 
-// unexpected bank omitted
-
 export class LedgerReconciliationService {
   constructor(
     private internalRepository: InternalLedgerRepository,
@@ -47,18 +45,34 @@ export class LedgerReconciliationService {
       bankGrouped.set(entry.reference, list);
     }
 
-    const internalRefs = new Set(
-      internal.map(i => i.reference)
-    );
+    for (const item of internal) {
+      const bankItems =
+        bankGrouped.get(item.reference);
 
-    for (const bankEntry of bank) {
-      if (
-        !internalRefs.has(bankEntry.reference)
-      ) {
-        result.unexpectedBank.push(
-          bankEntry.reference
+      if (!bankItems) {
+        result.missingInternal.push(
+          item.reference
         );
+        continue;
       }
+
+      if (bankItems.length > 1) {
+        result.duplicatedBank.push(
+          item.reference
+        );
+        continue;
+      }
+
+      const bankEntry = bankItems[0];
+
+      if (bankEntry.amount !== item.amount) {
+        result.amountMismatch.push(
+          item.reference
+        );
+        continue;
+      }
+
+      result.matched.push(item.reference);
     }
 
     await this.auditLogger.log(result);
