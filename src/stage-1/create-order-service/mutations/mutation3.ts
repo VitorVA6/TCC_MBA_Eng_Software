@@ -60,12 +60,9 @@ export class CreateOrderService {
     await this.eventBus.publish(
       'order.created',
       { 
-        id: 'order-1',
-        items: [
-          { productId: 'p1', quantity: 2, unitPrice: 10, subtotal: 20 },
-          { productId: 'p2', quantity: 3, unitPrice: 20, subtotal: 60 }
-        ],
-        total: 80 
+        id: 'o1',
+        items,
+        total,
       }
     );
 
