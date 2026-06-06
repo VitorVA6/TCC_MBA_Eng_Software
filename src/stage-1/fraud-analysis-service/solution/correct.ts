@@ -8,7 +8,7 @@ import {
   AuditLogger
 } from '../contract/interfaces';
 
-// nível fácil
+// nível médio
 
 export class FraudAnalysisService {
   constructor(
