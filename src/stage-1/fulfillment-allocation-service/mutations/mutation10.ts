@@ -228,7 +228,6 @@ export class FulfillmentAllocationService {
 
     await this.eventBus.publish('fulfillment.partial', {
       orderId: order.id,
-      unfulfilledItems
     });
 
     return result;

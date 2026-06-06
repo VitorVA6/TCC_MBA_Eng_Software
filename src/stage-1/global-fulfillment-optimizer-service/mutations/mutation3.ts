@@ -13,9 +13,7 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
-// não filtra stock com quantidade zero
-
-// 6. Ignores stock positions with zero quantity
+// não desconta estoque durante alocação
 
 function round2(value: number): number {
   return Number(value.toFixed(2));
@@ -84,7 +82,9 @@ export class GlobalFulfillmentOptimizerService {
     );
 
     const validStock = stock.filter(
-      item => activeWarehouseIds.has(item.warehouseId)
+      item =>
+        item.quantity > 0 &&
+        activeWarehouseIds.has(item.warehouseId)
     );
 
     const demandUnits = this.expandDemand(order);
@@ -229,7 +229,7 @@ export class GlobalFulfillmentOptimizerService {
         }
 
         const nextStock = new Map(stockState);
-        nextStock.set(stockKey, available - 1);
+        nextStock.set(stockKey, available);
 
         dfs(
           index + 1,

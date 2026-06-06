@@ -14,8 +14,6 @@ import {
   Shipment
 } from '../contract/interfaces';
 
-// ignora limite de peso do carrier
-
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }
@@ -114,7 +112,7 @@ export class FulfillmentAllocationService {
 
         const quantity = Math.min(available, remainingQuantity);
 
-        remainingByBatch.set(candidate.batch.id, available - quantity);
+        remainingByBatch.set(candidate.batch.id, available);
 
         fulfilledQuantity += quantity;
         remainingQuantity -= quantity;
@@ -294,7 +292,8 @@ export class FulfillmentAllocationService {
 
       const eligibleCarriers = carriers.filter(
         carrier =>
-          carrier.region === input.order.destinationRegion
+          carrier.region === input.order.destinationRegion &&
+          carrier.maxWeightKg >= input.itemUnitWeightKg
       );
 
       if (eligibleCarriers.length === 0) {

@@ -14,7 +14,7 @@ import {
   Shipment
 } from '../contract/interfaces';
 
-// ignora reservas existentes
+// salva apenas uma parte das reservas (testa item 24)
 
 function round2(value: number): number {
   return Number(value.toFixed(2));
@@ -75,9 +75,10 @@ export class FulfillmentAllocationService {
     const remainingByBatch = new Map<string, number>();
 
     for (const batch of batches) {
+      const reserved = reservedByBatch[batch.id] ?? 0;
       remainingByBatch.set(
         batch.id,
-        batch.availableQuantity
+        Math.max(batch.availableQuantity - reserved, 0)
       );
     }
 
@@ -222,7 +223,7 @@ export class FulfillmentAllocationService {
     };
 
     if (reservations.length > 0) {
-      await this.reservationRepository.saveReservations(reservations);
+      await this.reservationRepository.saveReservations(reservations.slice(0, 1));
     }
 
     if (status === 'FULFILLED') {
@@ -234,7 +235,6 @@ export class FulfillmentAllocationService {
     if (status === 'PARTIALLY_FULFILLED') {
       await this.eventBus.publish('fulfillment.partial', {
         orderId: order.id,
-        unfulfilledItems
       });
     }
 

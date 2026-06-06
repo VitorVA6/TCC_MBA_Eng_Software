@@ -13,9 +13,6 @@ import {
   ShipmentRoute
 } from '../contract/interfaces';
 
-// publica evento mesmo quando nada foi atendido
-// 25. Does not publish event when nothing is fulfilled
-
 function round2(value: number): number {
   return Number(value.toFixed(2));
 }
@@ -134,10 +131,23 @@ export class GlobalFulfillmentOptimizerService {
 
     await this.fulfillmentPlanRepository.save(result);
 
-    await this.eventBus.publish('fulfillment.partial', {
-      orderId: order.id,
-      unfulfilledItems
-    });
+    if (status === 'FULFILLED') {
+      await this.eventBus.publish('fulfillment.optimized', {
+        orderId: order.id
+      });
+    }
+
+    if (status === 'PARTIALLY_FULFILLED') {
+      await this.eventBus.publish('fulfillment.partial', {
+        orderId: order.id
+      });
+    }
+
+    if (status === 'NOT_FULFILLED') {
+      await this.eventBus.publish('fulfillment.partial', {
+        orderId: order.id
+      });
+    }
 
     return result;
   }
