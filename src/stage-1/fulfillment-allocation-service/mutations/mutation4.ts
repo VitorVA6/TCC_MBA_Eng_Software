@@ -18,7 +18,7 @@ function round2(value: number): number {
   return Number(value.toFixed(2));
 }
 
-// removed supported region validation
+// removeu validação de região suportada
 
 export class FulfillmentAllocationService {
   constructor(

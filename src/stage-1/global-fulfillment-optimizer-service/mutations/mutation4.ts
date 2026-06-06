@@ -15,7 +15,7 @@ import {
 
 // aceita rota inativa
 
-// 7. Ignores inactive route edges
+// 7. Deve ignorar arestas de rota inativas
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

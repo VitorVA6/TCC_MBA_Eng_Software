@@ -14,7 +14,7 @@ import {
   Shipment
 } from '../contract/interfaces';
 
-// removed expiration validation
+// removeu validação de validade
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

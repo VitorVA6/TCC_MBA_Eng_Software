@@ -14,7 +14,7 @@ import {
 } from '../contract/interfaces';
 
 // salva resultado diferente do retornado
-// 22. Saves the same result returned by execute
+// 22. Deve salvar o mesmo resultado retornado pelo método execute
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

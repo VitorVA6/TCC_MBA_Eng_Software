@@ -14,7 +14,7 @@ import {
   Shipment
 } from '../contract/interfaces';
 
-// removed inactive warehouse validation
+// removeu validação de armazens inativos
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

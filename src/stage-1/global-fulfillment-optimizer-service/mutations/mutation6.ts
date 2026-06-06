@@ -15,7 +15,7 @@ import {
 
 // ignora limite de peso da rota
 
-// 9. Ignores routes whose maxWeightKg is smaller than shipment total weight
+// 9. Deve ignorar rotas cuja maxWeightKg seja menor que o peso total do envio
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

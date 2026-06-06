@@ -15,7 +15,7 @@ import {
 
 // ignora warehouses inativos
 
-// 5. Ignores stock from inactive warehouses
+// 5. Deve ignorar o estoque de armazéns inativos
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

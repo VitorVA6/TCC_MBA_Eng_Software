@@ -14,8 +14,8 @@ import {
 } from '../contract/interfaces';
 
 // ignora limite máximo de dias
-// removed maxDeliveryDays validation
-// 10. Ignores routes whose total deliveryDays exceeds order maxDeliveryDays
+// removeu validação de maxDeliveryDays
+// 10. Deve ignorar rotas cujos deliveryDays totais excedam os maxDeliveryDays do pedido
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

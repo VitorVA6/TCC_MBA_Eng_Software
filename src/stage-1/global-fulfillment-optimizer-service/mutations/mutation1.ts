@@ -14,15 +14,14 @@ import {
 } from '../contract/interfaces';
 
 // MUTATION 1
-// Greedy per-unit allocation instead of global optimization.
 
 // Ideia da mutação:
 // Trocar o findBestPlan por uma versão gulosa que, para cada unidade,
 // escolhe o primeiro warehouse viável de menor rota individual,
 // sem considerar custo fixo compartilhado por shipment.
 
-// 14. Minimizes total cost globally
-// 15. Does not use greedy per-item allocation when it produces higher total cost
+// Deve minimizar o custo total globalmente
+// Não deve usar a alocação gulosa (greedy) por item quando esta produzir um custo total maior
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

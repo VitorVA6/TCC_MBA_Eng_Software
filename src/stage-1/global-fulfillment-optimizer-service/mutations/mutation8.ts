@@ -14,8 +14,8 @@ import {
 } from '../contract/interfaces';
 
 // prioriza menor custo antes de maior quantidade atendida
-// 17. Prefers full fulfillment over cheaper partial fulfillment
-// 18. Returns PARTIALLY_FULFILLED when only part of the order can be fulfilled
+// 17. Deve preferir o atendimento total ao invés do atendimento parcial mais barato
+// 18. Deve retornar PARTIALLY_FULFILLED quando apenas parte do pedido puder ser atendida
 
 function round2(value: number): number {
   return Number(value.toFixed(2));

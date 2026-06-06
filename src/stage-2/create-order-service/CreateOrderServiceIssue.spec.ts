@@ -1,134 +1,215 @@
-import { CreateOrderService } from '../create-order-service/correct'
+import { CreateOrderService } from './correct';
 import { ProductRepository, OrderRepository, EventBus, Product, Order } from '../../stage-1/create-order-service/contract/interfaces';
 
 describe('CreateOrderService', () => {
   let productRepository: jest.Mocked<ProductRepository>;
   let orderRepository: jest.Mocked<OrderRepository>;
   let eventBus: jest.Mocked<EventBus>;
-  let sut: CreateOrderService;
-
-  const mockProductA: Product = { id: 'p1', name: 'Product A', price: 10, stock: 100 };
-  const mockProductB: Product = { id: 'p2', name: 'Product B', price: 20, stock: 50 };
-
-  const mockOrder: Order = {
-    id: 'order-1',
-    items: [
-      { productId: 'p1', quantity: 2, unitPrice: 10, subtotal: 20 },
-      { productId: 'p2', quantity: 3, unitPrice: 20, subtotal: 60 }
-    ],
-    total: 80
-  };
+  let createOrderService: CreateOrderService;
 
   beforeEach(() => {
     productRepository = {
-      findById: jest.fn()
+      findById: jest.fn(),
     };
     orderRepository = {
-      save: jest.fn()
+      save: jest.fn(),
     };
     eventBus = {
-      publish: jest.fn()
+      publish: jest.fn(),
     };
 
-    sut = new CreateOrderService(productRepository, orderRepository, eventBus);
+    createOrderService = new CreateOrderService(
+      productRepository,
+      orderRepository,
+      eventBus
+    );
   });
 
-  it('should successfully create an order with valid multiple items, calculating subtotals and total correctly', async () => {
+  it('deve criar o pedido com sucesso com itens válidos', async () => {
+    const product: Product = { id: 'p1', name: 'Product 1', price: 100, stock: 10 };
+    const savedOrder: Order = { id: 'o1', items: [{ productId: 'p1', quantity: 2, unitPrice: 100, subtotal: 200 }], total: 200 };
+    
+    productRepository.findById.mockResolvedValue(product);
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    const result = await createOrderService.execute({ items: [{ productId: 'p1', quantity: 2 }] });
+    
+    expect(result).toEqual(savedOrder);
+    expect(orderRepository.save).toHaveBeenCalled();
+    expect(eventBus.publish).toHaveBeenCalledWith('order.created', savedOrder);
+  });
+
+  it('deve lançar um erro quando a lista de itens estiver vazia', async () => {
+    await expect(createOrderService.execute({ items: [] })).rejects.toThrow();
+  });
+
+  it('deve lançar um erro quando a quantidade for zero ou negativa', async () => {
+    await expect(createOrderService.execute({ items: [{ productId: 'p1', quantity: 0 }] })).rejects.toThrow();
+    await expect(createOrderService.execute({ items: [{ productId: 'p1', quantity: -1 }] })).rejects.toThrow();
+  });
+
+  it('deve lançar um erro quando o produto não existir', async () => {
+    productRepository.findById.mockResolvedValue(null);
+    await expect(createOrderService.execute({ items: [{ productId: 'p1', quantity: 1 }] })).rejects.toThrow();
+  });
+
+  it('deve lançar um erro quando a quantidade solicitada exceder o estoque', async () => {
+    const product: Product = { id: 'p1', name: 'Product 1', price: 100, stock: 5 };
+    productRepository.findById.mockResolvedValue(product);
+    await expect(createOrderService.execute({ items: [{ productId: 'p1', quantity: 6 }] })).rejects.toThrow();
+  });
+
+  it('deve calcular o subtotal de cada item corretamente', async () => {
+    const product1: Product = { id: 'p1', name: 'Product 1', price: 10, stock: 10 };
+    const product2: Product = { id: 'p2', name: 'Product 2', price: 20, stock: 10 };
+    
     productRepository.findById.mockImplementation(async (id) => {
-      if (id === 'p1') return mockProductA;
-      if (id === 'p2') return mockProductB;
+      if (id === 'p1') return product1;
+      if (id === 'p2') return product2;
       return null;
     });
 
-    orderRepository.save.mockResolvedValue(mockOrder);
-    eventBus.publish.mockResolvedValue(undefined);
-
-    const input = {
-      items: [
-        { productId: 'p1', quantity: 2 },
-        { productId: 'p2', quantity: 3 }
-      ]
-    };
-
-    const result = await sut.execute(input);
-
-    // Assertions for retrieving products
-    expect(productRepository.findById).toHaveBeenCalledWith('p1');
-    expect(productRepository.findById).toHaveBeenCalledWith('p2');
-    expect(productRepository.findById).toHaveBeenCalledTimes(2);
-
-    // Assertions for correctly calculating subtotals, total, and passing to repository
-    expect(orderRepository.save).toHaveBeenCalledWith({
+    const savedOrder: Order = { 
+      id: 'o1', 
       items: [
         { productId: 'p1', quantity: 2, unitPrice: 10, subtotal: 20 },
         { productId: 'p2', quantity: 3, unitPrice: 20, subtotal: 60 }
-      ],
-      total: 80
+      ], 
+      total: 80 
+    };
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    await createOrderService.execute({ items: [{ productId: 'p1', quantity: 2 }, { productId: 'p2', quantity: 3 }] });
+    
+    expect(orderRepository.save).toHaveBeenCalledWith(expect.objectContaining({
+      items: expect.arrayContaining([
+        expect.objectContaining({ productId: 'p1', subtotal: 20 }),
+        expect.objectContaining({ productId: 'p2', subtotal: 60 }),
+      ])
+    }));
+  });
+
+  it('deve calcular o valor total do pedido corretamente', async () => {
+    const product1: Product = { id: 'p1', name: 'Product 1', price: 10, stock: 10 };
+    const product2: Product = { id: 'p2', name: 'Product 2', price: 20, stock: 10 };
+    
+    productRepository.findById.mockImplementation(async (id) => {
+      if (id === 'p1') return product1;
+      if (id === 'p2') return product2;
+      return null;
     });
 
-    // Assertions for publishing the event and returning the saved order
-    expect(eventBus.publish).toHaveBeenCalledWith('order.created', mockOrder);
-    expect(result).toEqual(mockOrder);
+    const savedOrder: Order = { id: 'o1', items: [], total: 80 };
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    await createOrderService.execute({ items: [{ productId: 'p1', quantity: 2 }, { productId: 'p2', quantity: 3 }] });
+    
+    expect(orderRepository.save).toHaveBeenCalledWith(expect.objectContaining({
+      total: 80
+    }));
   });
 
-  it('should throw an error when the items list is empty', async () => {
-    await expect(sut.execute({ items: [] })).rejects.toThrow();
+  it('deve persistir o pedido com os dados corretos', async () => {
+    const product: Product = { id: 'p1', name: 'Product 1', price: 100, stock: 10 };
+    productRepository.findById.mockResolvedValue(product);
+    
+    const savedOrder: Order = { id: 'o1', items: [{ productId: 'p1', quantity: 1, unitPrice: 100, subtotal: 100 }], total: 100 };
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    await createOrderService.execute({ items: [{ productId: 'p1', quantity: 1 }] });
+    
+    expect(orderRepository.save).toHaveBeenCalledWith({
+      items: [{ productId: 'p1', quantity: 1, unitPrice: 100, subtotal: 100 }],
+      total: 100
+    });
+  });
 
-    expect(orderRepository.save).not.toHaveBeenCalled();
+  it('deve publicar o evento "order.created" após salvar com sucesso', async () => {
+    const product: Product = { id: 'p1', name: 'Product 1', price: 100, stock: 10 };
+    productRepository.findById.mockResolvedValue(product);
+    
+    const savedOrder: Order = { id: 'o1', items: [{ productId: 'p1', quantity: 1, unitPrice: 100, subtotal: 100 }], total: 100 };
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    await createOrderService.execute({ items: [{ productId: 'p1', quantity: 1 }] });
+    
+    expect(eventBus.publish).toHaveBeenCalledWith('order.created', savedOrder);
+  });
+
+  it('não deve publicar o evento se a persistência falhar', async () => {
+    const product: Product = { id: 'p1', name: 'Product 1', price: 100, stock: 10 };
+    productRepository.findById.mockResolvedValue(product);
+    
+    orderRepository.save.mockRejectedValue(new Error('DB Error'));
+    
+    await expect(createOrderService.execute({ items: [{ productId: 'p1', quantity: 1 }] })).rejects.toThrow('DB Error');
+    
     expect(eventBus.publish).not.toHaveBeenCalled();
   });
 
-  it('should throw an error when item quantity is zero or negative', async () => {
-    const inputZero = { items: [{ productId: 'p1', quantity: 0 }] };
-    const inputNegative = { items: [{ productId: 'p1', quantity: -5 }] };
-
-    await expect(sut.execute(inputZero)).rejects.toThrow();
-    await expect(sut.execute(inputNegative)).rejects.toThrow();
-
-    expect(orderRepository.save).not.toHaveBeenCalled();
+  it('deve chamar os métodos do repositório com os argumentos corretos', async () => {
+    const product: Product = { id: 'p1', name: 'Product 1', price: 100, stock: 10 };
+    productRepository.findById.mockResolvedValue(product);
+    
+    const savedOrder: Order = { id: 'o1', items: [{ productId: 'p1', quantity: 2, unitPrice: 100, subtotal: 200 }], total: 200 };
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    await createOrderService.execute({ items: [{ productId: 'p1', quantity: 2 }] });
+    
+    expect(productRepository.findById).toHaveBeenCalledWith('p1');
+    expect(productRepository.findById).toHaveBeenCalledTimes(1);
+    expect(orderRepository.save).toHaveBeenCalledTimes(1);
   });
 
-  it('should throw an error when a product does not exist', async () => {
-    productRepository.findById.mockResolvedValue(null);
+  it('deve suportar múltiplos itens no mesmo pedido', async () => {
+    const product1: Product = { id: 'p1', name: 'Product 1', price: 50, stock: 10 };
+    const product2: Product = { id: 'p2', name: 'Product 2', price: 100, stock: 10 };
+    
+    productRepository.findById.mockImplementation(async (id) => {
+      if (id === 'p1') return product1;
+      if (id === 'p2') return product2;
+      return null;
+    });
 
-    const input = { items: [{ productId: 'p1', quantity: 1 }] };
-
-    await expect(sut.execute(input)).rejects.toThrow();
-    expect(orderRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('should throw an error when requested quantity exceeds available stock', async () => {
-    productRepository.findById.mockResolvedValue({ ...mockProductA, stock: 5 });
-
-    const input = { items: [{ productId: 'p1', quantity: 10 }] };
-
-    await expect(sut.execute(input)).rejects.toThrow();
-    expect(orderRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('should not publish "order.created" event if saving the order fails', async () => {
-    productRepository.findById.mockResolvedValue(mockProductA);
-    orderRepository.save.mockRejectedValue(new Error('Database error'));
-
-    const input = { items: [{ productId: 'p1', quantity: 1 }] };
-
-    await expect(sut.execute(input)).rejects.toThrow('Database error');
-
-    // Make sure event is not published if we encounter an error in the persist step
-    expect(eventBus.publish).not.toHaveBeenCalled();
-  });
-
-  it('should throw an error when the total quantity of a duplicated product exceeds available stock', async () => {
-    productRepository.findById.mockResolvedValue({ ...mockProductA, stock: 5 });
-
-    const input = {
+    const savedOrder: Order = { 
+      id: 'o1', 
       items: [
-        { productId: 'p1', quantity: 3 },
-        { productId: 'p1', quantity: 3 }
-      ]
+        { productId: 'p1', quantity: 2, unitPrice: 50, subtotal: 100 },
+        { productId: 'p2', quantity: 1, unitPrice: 100, subtotal: 100 }
+      ], 
+      total: 200 
     };
+    orderRepository.save.mockResolvedValue(savedOrder);
+    
+    const result = await createOrderService.execute({ 
+      items: [
+        { productId: 'p1', quantity: 2 },
+        { productId: 'p2', quantity: 1 }
+      ] 
+    });
+    
+    expect(result).toEqual(savedOrder);
+    expect(productRepository.findById).toHaveBeenCalledTimes(2);
+    expect(orderRepository.save).toHaveBeenCalledWith({
+      items: [
+        { productId: 'p1', quantity: 2, unitPrice: 50, subtotal: 100 },
+        { productId: 'p2', quantity: 1, unitPrice: 100, subtotal: 100 }
+      ],
+      total: 200
+    });
+  });
 
-    await expect(sut.execute(input)).rejects.toThrow('Insufficient stock');
+  it('deve lançar um erro quando a soma das quantidades de itens com o mesmo produto exceder o estoque', async () => {
+    const product: Product = { id: 'PROD-1', name: 'Product 1', price: 10, stock: 5 };
+    productRepository.findById.mockResolvedValue(product);
+    
+    await expect(createOrderService.execute({ 
+      items: [
+        { productId: 'PROD-1', quantity: 3 },
+        { productId: 'PROD-1', quantity: 3 }
+      ] 
+    })).rejects.toThrow('Insufficient stock');
+
     expect(orderRepository.save).not.toHaveBeenCalled();
     expect(eventBus.publish).not.toHaveBeenCalled();
   });
