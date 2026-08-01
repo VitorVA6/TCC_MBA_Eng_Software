@@ -1,5 +1,4 @@
-import { FulfillmentAllocationService } from '../../stage-1/fulfillment-allocation-service/solution/correct';
-// import { FulfillmentAllocationService } from './correct';
+import { FulfillmentAllocationService } from './FulfillmentAllocationService';
 import {
   OrderRepository,
   InventoryRepository,
@@ -11,7 +10,7 @@ import {
   InventoryBatch,
   Warehouse,
   CarrierOption,
-} from '../../stage-1/fulfillment-allocation-service/contract/interfaces';
+} from './interfaces';
 
 describe('FulfillmentAllocationService', () => {
   let orderRepository: jest.Mocked<OrderRepository>;
@@ -390,21 +389,60 @@ describe('FulfillmentAllocationService', () => {
   });
 
   it('24. Deve salvar as reservas para todas as quantidades alocadas', async () => {
-    setupHappyPath();
-    
+    orderRepository.findById.mockResolvedValue(createOrder({
+      items: [
+        { productId: 'prod-1', quantity: 10, unitWeightKg: 1 },
+        { productId: 'prod-2', quantity: 5, unitWeightKg: 1 }
+      ]
+    }));
+
+    inventoryRepository.getBatches.mockResolvedValue([
+      createBatch({
+        id: 'batch-1',
+        productId: 'prod-1',
+        warehouseId: 'w-1',
+        availableQuantity: 10
+      }),
+      createBatch({
+        id: 'batch-2',
+        productId: 'prod-2',
+        warehouseId: 'w-1',
+        availableQuantity: 5
+      })
+    ]);
+
+    reservationRepository.getReservedQuantities.mockResolvedValue({});
+
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({ id: 'w-1' })
+    ]);
+
+    carrierRepository.getOptions.mockResolvedValue([
+      createCarrier({ id: 'c-1', warehouseId: 'w-1' })
+    ]);
+
     await service.execute({ orderId: 'order-1' });
-    expect(reservationRepository.saveReservations).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          orderId: 'order-1',
-          productId: 'prod-1',
-          batchId: 'batch-1',
-          warehouseId: 'w-1',
-          carrierId: 'c-1',
-          quantity: 10
-        })
-      ])
-    );
+
+    expect(reservationRepository.saveReservations).toHaveBeenCalledTimes(1);
+
+    expect(reservationRepository.saveReservations).toHaveBeenCalledWith([
+      {
+        orderId: 'order-1',
+        productId: 'prod-1',
+        batchId: 'batch-1',
+        warehouseId: 'w-1',
+        carrierId: 'c-1',
+        quantity: 10
+      },
+      {
+        orderId: 'order-1',
+        productId: 'prod-2',
+        batchId: 'batch-2',
+        warehouseId: 'w-1',
+        carrierId: 'c-1',
+        quantity: 5
+      }
+    ]);
   });
 
   it('25. Deve retornar FULFILLED quando todos os itens forem totalmente alocados', async () => {
@@ -525,40 +563,58 @@ describe('FulfillmentAllocationService', () => {
     expect(result.totalShippingCost).toBeCloseTo(19.00, 2);
   });
 
-  it('34. Deve garantir que o peso total de cada shipment não ultrapasse o maxWeightKg da transportadora', async () => {
-    setupHappyPath();
+  it('34. Deve reduzir o saldo restante do lote após cada alocação e não deve alocar mais do que o estoque disponível entre múltiplos itens do pedido.', async () => {
     orderRepository.findById.mockResolvedValue(createOrder({
-      items: [{ productId: 'prod-1', quantity: 4, unitWeightKg: 2 }]
+      items: [
+        { productId: 'prod-1', quantity: 7, unitWeightKg: 1 },
+        { productId: 'prod-1', quantity: 7, unitWeightKg: 1 }
+      ]
     }));
+
     inventoryRepository.getBatches.mockResolvedValue([
-      createBatch({ availableQuantity: 10 })
+      createBatch({
+        id: 'batch-1',
+        productId: 'prod-1',
+        warehouseId: 'w-1',
+        availableQuantity: 10
+      })
     ]);
+
+    reservationRepository.getReservedQuantities.mockResolvedValue({});
+
+    warehouseRepository.getWarehouses.mockResolvedValue([
+      createWarehouse({
+        id: 'w-1',
+        active: true,
+        supportedRegions: ['SP']
+      })
+    ]);
+
     carrierRepository.getOptions.mockResolvedValue([
-      createCarrier({ maxWeightKg: 5 })
+      createCarrier({
+        id: 'c-1',
+        warehouseId: 'w-1',
+        region: 'SP',
+        maxWeightKg: 100
+      })
     ]);
 
     const result = await service.execute({ orderId: 'order-1' });
 
     expect(result.status).toBe('PARTIALLY_FULFILLED');
-    expect(result.shipments).toHaveLength(1);
-    expect(result.shipments[0].items[0].quantity).toBe(2);
-    expect(result.shipments[0].totalWeightKg).toBe(4);
-    expect(result.unfulfilledItems).toContainEqual(
-      expect.objectContaining({
-        productId: 'prod-1',
-        requestedQuantity: 4,
-        fulfilledQuantity: 2
-      })
-    );
-    expect(reservationRepository.saveReservations).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          quantity: 2
-        })
-      ])
-    );
-    expect(eventBus.publish).toHaveBeenCalledWith('fulfillment.partial', {
-      orderId: 'order-1'
+
+    expect(result.unfulfilledItems).toContainEqual({
+      productId: 'prod-1',
+      requestedQuantity: 7,
+      fulfilledQuantity: 3,
+      reason: 'NO_STOCK'
     });
+
+    expect(result.shipments[0].items).toEqual([
+      { productId: 'prod-1', batchId: 'batch-1', quantity: 7 },
+      { productId: 'prod-1', batchId: 'batch-1', quantity: 3 }
+    ]);
+
+    expect(result.shipments[0].totalWeightKg).toBe(10);
   });
 });
