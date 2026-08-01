@@ -1,4 +1,4 @@
-import { SubscriptionBillingService } from '../../../stage-1/subscription-billing-service/mutations/mutation1';
+import { SubscriptionBillingService } from './SubscriptionBillingService';
 import {
   UserRepository,
   PlanRepository,

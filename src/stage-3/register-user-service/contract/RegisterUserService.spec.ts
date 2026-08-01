@@ -1,4 +1,4 @@
-import { RegisterUserService } from '../mutations/mutation4';
+import { RegisterUserService } from './RegisterUserService';
 import { UserRepository, EmailService, User } from './interfaces';
 
 describe('RegisterUserService', () => {

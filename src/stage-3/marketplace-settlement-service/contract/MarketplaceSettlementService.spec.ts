@@ -1,4 +1,4 @@
-import { MarketplaceSettlementService } from '../mutation/mutation3';
+import { MarketplaceSettlementService } from './MarketplaceSettlementService';
 import {
   OrderRepository,
   OrderItemRepository,

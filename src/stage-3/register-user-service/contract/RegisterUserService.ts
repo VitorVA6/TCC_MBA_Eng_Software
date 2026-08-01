@@ -10,6 +10,21 @@ export class RegisterUserService {
     name: string;
     email: string;
   }): Promise<User> {
-    throw new Error('Not implemented');
+    if (!input.name || input.name.trim() === '') {
+      throw new Error('Name cannot be empty');
+    }
+    if (!input.email || input.email.trim() === '') {
+      throw new Error('Email cannot be empty');
+    }
+
+    const existingUser = await this.userRepository.findByEmail(input.email);
+    if (existingUser) {
+      throw new Error('Email already registered');
+    }
+
+    const user = await this.userRepository.save(input);
+    await this.emailService.sendWelcomeEmail(input.email, input.name);
+
+    return user;
   }
 }

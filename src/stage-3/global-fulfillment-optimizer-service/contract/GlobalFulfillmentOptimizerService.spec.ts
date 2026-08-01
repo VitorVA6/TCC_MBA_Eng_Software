@@ -1,4 +1,4 @@
-import { GlobalFulfillmentOptimizerService } from '../../../stage-1/global-fulfillment-optimizer-service/solution/correct';
+import { GlobalFulfillmentOptimizerService } from './GlobalFulfillmentOptimizerService';
 import {
   OrderRepository,
   StockRepository,

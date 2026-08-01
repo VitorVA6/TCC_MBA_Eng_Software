@@ -1,4 +1,4 @@
-import { FraudAnalysisService } from '../../../stage-1/fraud-analysis-service/mutations/mutation3';
+import { FraudAnalysisService } from './FraudAnalysisService';
 import {
   UserRepository,
   TransactionRepository,

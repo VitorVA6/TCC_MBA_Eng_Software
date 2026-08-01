@@ -1,4 +1,4 @@
-import { CreateOrderService } from '../mutations/mutation5';
+import { CreateOrderService } from './CreateOrderService';
 import { ProductRepository, OrderRepository, EventBus, Product, Order } from './interfaces';
 
 describe('CreateOrderService', () => {
